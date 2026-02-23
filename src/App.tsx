@@ -232,11 +232,11 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setCurrentImage(idx)}
                   className={cn(
-                    "flex-1 aspect-video rounded-xl overflow-hidden border-2 border-black transition-all",
-                    currentImage === idx ? "ring-2 ring-purple-500" : "opacity-50 hover:opacity-100"
+                    "flex-1 aspect-video rounded-xl overflow-hidden border-2 transition-all",
+                    currentImage === idx ? "border-purple-500" : "border-transparent opacity-50 hover:opacity-100"
                   )}
                 >
-                  <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover rounded-xl border-2 border-black" />
+                  <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
                 </motion.button>
               ))}
             </div>
