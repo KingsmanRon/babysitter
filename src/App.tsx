@@ -89,7 +89,7 @@ const VideoSection = () => {
           >
             <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-white flex items-center justify-center animate-pulse">
               <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-white flex items-center justify-center overflow-hidden">
-                <img src="/media/logo2.jpeg" alt="BABYSITTER logo" className="w-14 h-14 sm:w-20 sm:h-20 object-cover rounded-full" />
+                <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
               </div>
             </div>
           </motion.div>
@@ -100,7 +100,7 @@ const VideoSection = () => {
             transition={{ delay: 1.2 }}
             className="text-lg sm:text-xl md:text-2xl text-gray-300 mb-8 sm:mb-12 max-w-2xl"
           >
-            CHANGING THE WORLD ONE GARMENT AT A TIME
+            CHANGING THE WORLD ONE GARMENT AT A <span className="font-black text-white">TIME</span>
           </motion.p>
         </motion.div>
 
