@@ -1,13 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
 import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, CreditCard, Shield, Zap, Star } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { useInView } from 'react-intersection-observer';
-
-function cn(...inputs: any[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from './utils/cn';
 
 const PRODUCT = {
   name: "LUNA™ Edge Sneakers",
@@ -27,6 +22,7 @@ const PRODUCT = {
   ]
 };
 
+// --- Fix #1: Video play/pause now calls .play()/.pause() on the element ---
 const VideoSection = () => {
   const [isPlaying, setIsPlaying] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -34,18 +30,31 @@ const VideoSection = () => {
   const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.8]);
   const opacity = useTransform(scrollYProgress, [0, 0.3], [1, 0.3]);
 
+  const togglePlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (isPlaying) {
+      video.pause();
+    } else {
+      video.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
   return (
     <section className="relative h-screen w-full overflow-hidden bg-black">
-      <motion.div 
+      <motion.div
         style={{ scale, opacity }}
         className="absolute inset-0"
       >
+        {/* Fix #9d: Added aria-label for video accessibility */}
         <video
           ref={videoRef}
           autoPlay
           muted
           loop
           playsInline
+          aria-label="Promotional video showcasing LUNA Edge Sneakers"
           className="w-full h-full object-cover opacity-60"
         >
           <source src={PRODUCT.video} type="video/mp4" />
@@ -53,7 +62,7 @@ const VideoSection = () => {
       </motion.div>
 
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black" />
-      
+
       <motion.div
         initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
@@ -81,8 +90,8 @@ const VideoSection = () => {
           </span>
           <span className="text-white/80">™</span>
         </h1>
-        
-        <motion.p 
+
+        <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
@@ -95,7 +104,7 @@ const VideoSection = () => {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 1.5 }}
-          onClick={() => setIsPlaying(!isPlaying)}
+          onClick={togglePlay}
           className="group relative flex items-center gap-3 px-8 py-4 bg-white/10 backdrop-blur-lg rounded-full border border-white/20 hover:bg-white/20 transition-all duration-300"
         >
           <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -109,7 +118,7 @@ const VideoSection = () => {
         </motion.button>
       </motion.div>
 
-      <motion.div 
+      <motion.div
         animate={{ y: [0, 10, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
         className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10"
@@ -123,19 +132,34 @@ const VideoSection = () => {
   );
 };
 
-const ProductSection = () => {
-  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+// --- Fix #3: ProductSection now receives lifted state via props ---
+// --- Fix #8: setTimeout is cleaned up on unmount via ref ---
+interface ProductSectionProps {
+  selectedSize: string | null;
+  setSelectedSize: (size: string | null) => void;
+  onAddToCart: () => void;
+}
+
+const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductSectionProps) => {
   const [currentImage, setCurrentImage] = useState(0);
   const [isAdded, setIsAdded] = useState(false);
-  const [showCart, setShowCart] = useState(false);
+  const addToCartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { ref, inView } = useInView({
     threshold: 0.2,
     triggerOnce: true
   });
 
+  useEffect(() => {
+    return () => {
+      if (addToCartTimeoutRef.current) {
+        clearTimeout(addToCartTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
-    <section 
+    <section
       ref={ref}
       className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black py-20 px-6 relative overflow-hidden"
     >
@@ -162,9 +186,9 @@ const ProductSection = () => {
                 alt={PRODUCT.name}
                 className="w-full h-full object-cover"
               />
-              
+
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-              
+
               <div className="absolute top-6 right-6">
                 <div className="px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full text-white font-bold text-sm">
                   NEW
@@ -239,7 +263,7 @@ const ProductSection = () => {
                   Size Guide
                 </button>
               </div>
-              
+
               <div className="grid grid-cols-3 gap-3">
                 {PRODUCT.sizes.map((size, idx) => (
                   <motion.button
@@ -290,8 +314,8 @@ const ProductSection = () => {
                 onClick={() => {
                   if (selectedSize) {
                     setIsAdded(true);
-                    setTimeout(() => {
-                      setShowCart(true);
+                    addToCartTimeoutRef.current = setTimeout(() => {
+                      onAddToCart();
                       setIsAdded(false);
                     }, 1000);
                   }
@@ -331,21 +355,32 @@ const ProductSection = () => {
           </motion.div>
         </div>
       </div>
-
-      <AnimatePresence>
-        {showCart && (
-          <CheckoutModal
-            product={PRODUCT}
-            size={selectedSize!}
-            onClose={() => setShowCart(false)}
-          />
-        )}
-      </AnimatePresence>
     </section>
   );
 };
 
-const CheckoutModal = ({ product, size, onClose }: { product: any; size: string; onClose: () => void }) => {
+// --- Fix #7: Payment field formatting helpers ---
+const formatCardNumber = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+};
+
+const formatExpiry = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length >= 2) {
+    return digits.slice(0, 2) + '/' + digits.slice(2, 4);
+  }
+  return digits;
+};
+
+const formatCvc = (value: string) => {
+  return value.replace(/\D/g, '');
+};
+
+// --- Fix #5: Order number generated once via useRef ---
+// --- Fix #6: size prop guarded with default ---
+// --- Fix #9c: Focus trapping in modal ---
+const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; size: string; onClose: () => void }) => {
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [formData, setFormData] = useState({
@@ -355,13 +390,53 @@ const CheckoutModal = ({ product, size, onClose }: { product: any; size: string;
     expiry: "",
     cvc: ""
   });
+  const orderNumber = useRef(`#LN-${Math.random().toString(36).substr(2, 8).toUpperCase()}`);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  const stableOnClose = useCallback(onClose, [onClose]);
+
+  // Focus trapping
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const focusableElements = modal.querySelectorAll<HTMLElement>(focusableSelector);
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    firstElement?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        stableOnClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement?.focus();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [step, stableOnClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
-    
+
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     setIsProcessing(false);
     setStep(3);
   };
@@ -373,8 +448,12 @@ const CheckoutModal = ({ product, size, onClose }: { product: any; size: string;
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Checkout"
     >
       <motion.div
+        ref={modalRef}
         initial={{ scale: 0.9, y: 50 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 50 }}
@@ -385,6 +464,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: any; size: string;
         <div className="relative">
           <button
             onClick={onClose}
+            aria-label="Close checkout"
             className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
@@ -491,14 +571,17 @@ const CheckoutModal = ({ product, size, onClose }: { product: any; size: string;
                 </div>
               </div>
 
+              {/* Fix #7: Payment fields with inputMode="numeric" and auto-formatting */}
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-2">Card Number</label>
                 <div className="relative">
                   <input
                     type="text"
+                    inputMode="numeric"
+                    pattern="[\d ]{13,19}"
                     required
                     value={formData.cardNumber}
-                    onChange={(e) => setFormData({...formData, cardNumber: e.target.value})}
+                    onChange={(e) => setFormData({...formData, cardNumber: formatCardNumber(e.target.value)})}
                     className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
                     placeholder="4242 4242 4242 4242"
                     maxLength={19}
@@ -515,9 +598,11 @@ const CheckoutModal = ({ product, size, onClose }: { product: any; size: string;
                   <label className="block text-sm font-medium text-gray-400 mb-2">Expiry Date</label>
                   <input
                     type="text"
+                    inputMode="numeric"
+                    pattern="\d{2}/\d{2}"
                     required
                     value={formData.expiry}
-                    onChange={(e) => setFormData({...formData, expiry: e.target.value})}
+                    onChange={(e) => setFormData({...formData, expiry: formatExpiry(e.target.value)})}
                     className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
                     placeholder="MM/YY"
                     maxLength={5}
@@ -527,9 +612,11 @@ const CheckoutModal = ({ product, size, onClose }: { product: any; size: string;
                   <label className="block text-sm font-medium text-gray-400 mb-2">CVC</label>
                   <input
                     type="text"
+                    inputMode="numeric"
+                    pattern="\d{3,4}"
                     required
                     value={formData.cvc}
-                    onChange={(e) => setFormData({...formData, cvc: e.target.value})}
+                    onChange={(e) => setFormData({...formData, cvc: formatCvc(e.target.value)})}
                     className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
                     placeholder="123"
                     maxLength={4}
@@ -574,7 +661,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: any; size: string;
               <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center">
                 <Check className="w-12 h-12 text-white" />
               </div>
-              
+
               <div className="space-y-2">
                 <h3 className="text-2xl font-bold text-white">Order Confirmed!</h3>
                 <p className="text-gray-400">Check your email for tracking information</p>
@@ -582,7 +669,8 @@ const CheckoutModal = ({ product, size, onClose }: { product: any; size: string;
 
               <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
                 <p className="text-sm text-gray-400">Order Number</p>
-                <p className="text-lg font-mono text-purple-400">#LN-{Math.random().toString(36).substr(2, 8).toUpperCase()}</p>
+                {/* Fix #5: Order number stable across re-renders */}
+                <p className="text-lg font-mono text-purple-400">{orderNumber.current}</p>
               </div>
 
               <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
@@ -618,7 +706,7 @@ const Footer = () => {
             </div>
             <p className="text-gray-500">Revolutionary footwear for the modern world.</p>
           </div>
-          
+
           <div>
             <h4 className="text-white font-semibold mb-4">Shop</h4>
             <ul className="space-y-2 text-gray-500">
@@ -628,7 +716,7 @@ const Footer = () => {
               <li><a href="#" className="hover:text-purple-400 transition-colors">Sale</a></li>
             </ul>
           </div>
-          
+
           <div>
             <h4 className="text-white font-semibold mb-4">Support</h4>
             <ul className="space-y-2 text-gray-500">
@@ -638,7 +726,7 @@ const Footer = () => {
               <li><a href="#" className="hover:text-purple-400 transition-colors">Contact</a></li>
             </ul>
           </div>
-          
+
           <div>
             <h4 className="text-white font-semibold mb-4">Newsletter</h4>
             <p className="text-gray-500 mb-4">Get exclusive offers and product updates</p>
@@ -654,9 +742,10 @@ const Footer = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-gray-500 text-sm">© 2024 LUNA. All rights reserved.</p>
+          {/* Fix #9a: Dynamic copyright year */}
+          <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} LUNA. All rights reserved.</p>
           <div className="flex items-center gap-4 text-gray-500 text-sm">
             <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
@@ -693,15 +782,24 @@ const FloatingCart = ({ onClick, count }: { onClick: () => void; count: number }
   );
 };
 
+// --- Fix #3: Single source of truth for cart state, lifted to App ---
+// --- Fix #4: cartCount setter is now available and wired up ---
+// --- Fix #6: Modal only renders when selectedSize is truthy (no null assertion needed) ---
 export default function App() {
   const [showCart, setShowCart] = useState(false);
-  const [cartCount] = useState(0);
+  const [cartCount, setCartCount] = useState(0);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
     damping: 30,
     restDelta: 0.001
   });
+
+  const handleAddToCart = () => {
+    setCartCount(prev => prev + 1);
+    setShowCart(true);
+  };
 
   return (
     <div className="bg-black min-h-screen">
@@ -711,16 +809,20 @@ export default function App() {
       />
 
       <VideoSection />
-      <ProductSection />
+      <ProductSection
+        selectedSize={selectedSize}
+        setSelectedSize={setSelectedSize}
+        onAddToCart={handleAddToCart}
+      />
       <Footer />
-      
+
       <FloatingCart onClick={() => setShowCart(true)} count={cartCount} />
 
       <AnimatePresence>
-        {showCart && (
+        {showCart && selectedSize && (
           <CheckoutModal
             product={PRODUCT}
-            size="US 8"
+            size={selectedSize}
             onClose={() => setShowCart(false)}
           />
         )}
