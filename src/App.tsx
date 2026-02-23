@@ -252,7 +252,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentIma
                 <span className="text-purple-400 font-medium uppercase tracking-widest text-sm">
                   Limited Edition
                 </span>
-                <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white mt-2 leading-tight">
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mt-2 leading-tight">
                   {PRODUCT.name}
                 </h2>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
