@@ -203,7 +203,8 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
             transition={{ duration: 0.8 }}
             className="relative"
           >
-            <div className="relative aspect-square rounded-3xl overflow-hidden" style={{ backgroundImage: 'url(/media/bg1.png)', backgroundRepeat: 'repeat', backgroundSize: '250px', opacity: 0.5 }}>
+            <div className="relative aspect-square rounded-3xl overflow-hidden">
+              <div className="absolute inset-0" style={{ backgroundImage: 'url(/media/bg1.png)', backgroundRepeat: 'repeat', backgroundSize: '250px', opacity: 0.2 }} />
               <motion.img
                 key={currentImage}
                 initial={{ opacity: 0, scale: 1.1 }}
