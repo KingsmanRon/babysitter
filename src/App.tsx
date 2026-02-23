@@ -61,7 +61,7 @@ const VideoSection = () => {
           loop
           playsInline
           aria-label="Promotional video showcasing BABYSITTER clothing and accessories"
-          className="w-full h-full object-cover opacity-80"
+          className="w-full h-full object-cover opacity-90"
         >
           <source src={PRODUCT.video} type="video/mp4" />
         </video>
