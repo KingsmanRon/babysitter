@@ -67,33 +67,39 @@ const VideoSection = () => {
         className="relative z-10 flex flex-col items-center justify-center h-full text-center px-6"
       >
         <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 100, delay: 0.8 }}
-          className="mb-6"
+          animate={{ opacity: isPlaying ? 0.08 : 1 }}
+          transition={{ duration: 0.6 }}
+          className="flex flex-col items-center"
         >
-          <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center animate-pulse">
-            <div className="w-28 h-28 rounded-full bg-black flex items-center justify-center overflow-hidden">
-              <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-20 h-20 object-contain" />
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 100, delay: 0.8 }}
+            className="mb-6"
+          >
+            <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center animate-pulse">
+              <div className="w-28 h-28 rounded-full bg-black flex items-center justify-center overflow-hidden">
+                <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-20 h-20 object-contain" />
+              </div>
             </div>
-          </div>
+          </motion.div>
+
+          <h1 className="text-6xl md:text-8xl lg:text-9xl font-black text-white mb-4 tracking-tighter">
+            <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
+              BABYSITTER
+            </span>
+            <span className="text-white/80">™</span>
+          </h1>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.2 }}
+            className="text-xl md:text-2xl text-gray-300 mb-12 max-w-2xl"
+          >
+            Clothing & Accessories for the <span className="font-black text-white">BOLD</span>
+          </motion.p>
         </motion.div>
-
-        <h1 className="text-6xl md:text-8xl lg:text-9xl font-black text-white mb-4 tracking-tighter">
-          <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
-            BABYSITTER
-          </span>
-          <span className="text-white/80">™</span>
-        </h1>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-          className="text-xl md:text-2xl text-gray-300 mb-12 max-w-2xl"
-        >
-          Clothing & accessories for the bold
-        </motion.p>
 
         <motion.button
           initial={{ opacity: 0, scale: 0.8 }}
