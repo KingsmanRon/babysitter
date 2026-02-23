@@ -64,7 +64,7 @@ const VideoSection = () => {
         initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1, delay: 0.5 }}
-        className="relative z-10 flex flex-col items-center justify-center h-full text-center px-6"
+        className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4 sm:px-6"
       >
         <motion.div
           animate={{ opacity: isPlaying ? 0.02 : 1 }}
@@ -77,14 +77,14 @@ const VideoSection = () => {
             transition={{ type: "spring", stiffness: 100, delay: 0.8 }}
             className="mb-6"
           >
-            <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center animate-pulse">
-              <div className="w-28 h-28 rounded-full bg-black flex items-center justify-center overflow-hidden">
-                <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-20 h-20 object-contain" />
+            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center animate-pulse">
+              <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-black flex items-center justify-center overflow-hidden">
+                <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
               </div>
             </div>
           </motion.div>
 
-          <h1 className="text-6xl md:text-8xl lg:text-9xl font-black text-white mb-4 tracking-tighter">
+          <h1 className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white mb-4 tracking-tighter">
             <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
               BABYSITTER
             </span>
@@ -95,7 +95,7 @@ const VideoSection = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.2 }}
-            className="text-xl md:text-2xl text-gray-300 mb-12 max-w-2xl"
+            className="text-lg sm:text-xl md:text-2xl text-gray-300 mb-8 sm:mb-12 max-w-2xl"
           >
             Clothing & Accessories for the <span className="font-black text-white">BOLD</span>
           </motion.p>
@@ -106,9 +106,9 @@ const VideoSection = () => {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 1.5 }}
           onClick={togglePlay}
-          className="group relative flex items-center gap-3 px-8 py-4 bg-white/10 backdrop-blur-lg rounded-full border border-white/20 hover:bg-white/20 transition-all duration-300"
+          className="group relative flex items-center gap-2 sm:gap-3 px-5 sm:px-8 py-3 sm:py-4 bg-white/10 backdrop-blur-lg rounded-full border border-white/20 hover:bg-white/20 transition-all duration-300"
         >
-          <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center group-hover:scale-110 transition-transform">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white flex items-center justify-center group-hover:scale-110 transition-transform">
             {isPlaying ? (
               <Pause className="w-5 h-5 text-black fill-current" />
             ) : (
@@ -162,7 +162,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
   return (
     <section
       ref={ref}
-      className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black py-20 px-6 relative overflow-hidden"
+      className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black py-12 sm:py-20 px-4 sm:px-6 relative overflow-hidden"
     >
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
@@ -170,7 +170,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
       </div>
 
       <div className="max-w-7xl mx-auto relative z-10">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
+        <div className="grid lg:grid-cols-2 gap-8 sm:gap-16 items-center">
           <motion.div
             initial={{ opacity: 0, x: -100 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
@@ -197,7 +197,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
               </div>
             </div>
 
-            <div className="flex gap-4 mt-6">
+            <div className="flex gap-2 sm:gap-4 mt-4 sm:mt-6">
               {PRODUCT.images.map((img, idx) => (
                 <motion.button
                   key={idx}
@@ -230,12 +230,12 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                 <span className="text-purple-400 font-medium uppercase tracking-widest text-sm">
                   Limited Edition
                 </span>
-                <h2 className="text-5xl md:text-6xl font-black text-white mt-2 leading-tight">
+                <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white mt-2 leading-tight">
                   {PRODUCT.name}
                 </h2>
-                <div className="flex items-center gap-4 mt-4">
-                  <span className="text-4xl font-bold text-white">R{PRODUCT.price}</span>
-                  <span className="text-xl text-gray-500 line-through">R450</span>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
+                  <span className="text-3xl sm:text-4xl font-bold text-white">R{PRODUCT.price}</span>
+                  <span className="text-lg sm:text-xl text-gray-500 line-through">R450</span>
                   <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
                     33% OFF
                   </span>
@@ -247,7 +247,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
               initial={{ opacity: 0, y: 20 }}
               animate={inView ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.4 }}
-              className="text-gray-400 text-lg leading-relaxed"
+              className="text-gray-400 text-base sm:text-lg leading-relaxed"
             >
               {PRODUCT.description}
             </motion.p>
@@ -346,15 +346,132 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
 };
 
 // PayFast configuration
+// ──────────────────────────────────────────────────────────────────────
+// HOW TO SET UP PAYFAST:
+//
+// 1. Create a PayFast account at https://www.payfast.co.za
+// 2. Go to Settings → Integration to get your merchant_id and merchant_key
+// 3. For testing, use the sandbox credentials below (already set):
+//      merchant_id:  10000100
+//      merchant_key: 46f0cd694581a
+//      passphrase:   (leave empty for sandbox)
+// 4. Set action_url to sandbox for testing:
+//      https://sandbox.payfast.co.za/eng/process
+// 5. For PRODUCTION, update:
+//      merchant_id  → your real Merchant ID from PayFast dashboard
+//      merchant_key → your real Merchant Key
+//      passphrase   → your passphrase from Settings → Integration
+//      action_url   → https://www.payfast.co.za/eng/process
+// 6. notify_url (ITN): When you have a backend server, set this to
+//    your server endpoint (e.g. https://yourdomain.co.za/api/payfast/notify)
+//    PayFast sends POST requests here to confirm payment status.
+//    Without this, you rely on the return_url redirect only.
+//
+// FLOW: Customer fills in details → clicks Pay → redirected to PayFast →
+//       pays via card/EFT/SnapScan → redirected back to return_url or cancel_url
+// ──────────────────────────────────────────────────────────────────────
 const PAYFAST_CONFIG = {
-  merchant_id: '10000100',       // Replace with your PayFast Merchant ID
-  merchant_key: '46f0cd694581a',  // Replace with your PayFast Merchant Key
-  // Use sandbox for testing, switch to www.payfast.co.za for production
+  merchant_id: '10000100',
+  merchant_key: '46f0cd694581a',
+  passphrase: '',  // Set your passphrase for production (Settings → Integration)
   action_url: 'https://sandbox.payfast.co.za/eng/process',
-  return_url: window.location.origin,  // Redirect after successful payment
-  cancel_url: window.location.origin,  // Redirect if payment is cancelled
-  notify_url: '',                       // Your server ITN endpoint (set when you have a backend)
+  return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
+  cancel_url: `${window.location.origin}${window.location.pathname}?payment=cancelled`,
+  notify_url: '',
 };
+
+// Generate PayFast MD5 signature (required for production)
+const generatePayFastSignature = (data: Record<string, string>, passphrase?: string): string => {
+  const params = Object.entries(data)
+    .filter(([, value]) => value !== '')
+    .map(([key, value]) => `${key}=${encodeURIComponent(value.trim()).replace(/%20/g, '+')}`)
+    .join('&');
+  const signatureString = passphrase ? `${params}&passphrase=${encodeURIComponent(passphrase.trim()).replace(/%20/g, '+')}` : params;
+  // MD5 hash — using SubtleCrypto would be async; for simplicity, we use a
+  // lightweight MD5 implementation inline. In production, consider a server-side
+  // signature generation for security.
+  return md5(signatureString);
+};
+
+// Lightweight MD5 implementation for PayFast signature
+function md5(string: string): string {
+  function md5cycle(x: number[], k: number[]) {
+    let a = x[0], b = x[1], c = x[2], d = x[3];
+    a = ff(a, b, c, d, k[0], 7, -680876936); d = ff(d, a, b, c, k[1], 12, -389564586);
+    c = ff(c, d, a, b, k[2], 17, 606105819); b = ff(b, c, d, a, k[3], 22, -1044525330);
+    a = ff(a, b, c, d, k[4], 7, -176418897); d = ff(d, a, b, c, k[5], 12, 1200080426);
+    c = ff(c, d, a, b, k[6], 17, -1473231341); b = ff(b, c, d, a, k[7], 22, -45705983);
+    a = ff(a, b, c, d, k[8], 7, 1770035416); d = ff(d, a, b, c, k[9], 12, -1958414417);
+    c = ff(c, d, a, b, k[10], 17, -42063); b = ff(b, c, d, a, k[11], 22, -1990404162);
+    a = ff(a, b, c, d, k[12], 7, 1804603682); d = ff(d, a, b, c, k[13], 12, -40341101);
+    c = ff(c, d, a, b, k[14], 17, -1502002290); b = ff(b, c, d, a, k[15], 22, 1236535329);
+    a = gg(a, b, c, d, k[1], 5, -165796510); d = gg(d, a, b, c, k[6], 9, -1069501632);
+    c = gg(c, d, a, b, k[11], 14, 643717713); b = gg(b, c, d, a, k[0], 20, -373897302);
+    a = gg(a, b, c, d, k[5], 5, -701558691); d = gg(d, a, b, c, k[10], 9, 38016083);
+    c = gg(c, d, a, b, k[15], 14, -660478335); b = gg(b, c, d, a, k[4], 20, -405537848);
+    a = gg(a, b, c, d, k[9], 5, 568446438); d = gg(d, a, b, c, k[14], 9, -1019803690);
+    c = gg(c, d, a, b, k[3], 14, -187363961); b = gg(b, c, d, a, k[8], 20, 1163531501);
+    a = gg(a, b, c, d, k[13], 5, -1444681467); d = gg(d, a, b, c, k[2], 9, -51403784);
+    c = gg(c, d, a, b, k[7], 14, 1735328473); b = gg(b, c, d, a, k[12], 20, -1926607734);
+    a = hh(a, b, c, d, k[5], 4, -378558); d = hh(d, a, b, c, k[8], 11, -2022574463);
+    c = hh(c, d, a, b, k[11], 16, 1839030562); b = hh(b, c, d, a, k[14], 23, -35309556);
+    a = hh(a, b, c, d, k[1], 4, -1530992060); d = hh(d, a, b, c, k[4], 11, 1272893353);
+    c = hh(c, d, a, b, k[7], 16, -155497632); b = hh(b, c, d, a, k[10], 23, -1094730640);
+    a = hh(a, b, c, d, k[13], 4, 681279174); d = hh(d, a, b, c, k[0], 11, -358537222);
+    c = hh(c, d, a, b, k[3], 16, -722521979); b = hh(b, c, d, a, k[6], 23, 76029189);
+    a = hh(a, b, c, d, k[9], 4, -640364487); d = hh(d, a, b, c, k[12], 11, -421815835);
+    c = hh(c, d, a, b, k[15], 16, 530742520); b = hh(b, c, d, a, k[2], 23, -995338651);
+    a = ii(a, b, c, d, k[0], 6, -198630844); d = ii(d, a, b, c, k[7], 10, 1126891415);
+    c = ii(c, d, a, b, k[14], 15, -1416354905); b = ii(b, c, d, a, k[5], 21, -57434055);
+    a = ii(a, b, c, d, k[12], 6, 1700485571); d = ii(d, a, b, c, k[3], 10, -1894986606);
+    c = ii(c, d, a, b, k[10], 15, -1051523); b = ii(b, c, d, a, k[1], 21, -2054922799);
+    a = ii(a, b, c, d, k[8], 6, 1873313359); d = ii(d, a, b, c, k[15], 10, -30611744);
+    c = ii(c, d, a, b, k[6], 15, -1560198380); b = ii(b, c, d, a, k[13], 21, 1309151649);
+    a = ii(a, b, c, d, k[4], 6, -145523070); d = ii(d, a, b, c, k[11], 10, -1120210379);
+    c = ii(c, d, a, b, k[2], 15, 718787259); b = ii(b, c, d, a, k[9], 21, -343485551);
+    x[0] = add32(a, x[0]); x[1] = add32(b, x[1]); x[2] = add32(c, x[2]); x[3] = add32(d, x[3]);
+  }
+  function cmn(q: number, a: number, b: number, x: number, s: number, t: number) {
+    a = add32(add32(a, q), add32(x, t));
+    return add32((a << s) | (a >>> (32 - s)), b);
+  }
+  function ff(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn((b & c) | ((~b) & d), a, b, x, s, t); }
+  function gg(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn((b & d) | (c & (~d)), a, b, x, s, t); }
+  function hh(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn(b ^ c ^ d, a, b, x, s, t); }
+  function ii(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn(c ^ (b | (~d)), a, b, x, s, t); }
+  function md51(s: string) {
+    const n = s.length;
+    let state = [1732584193, -271733879, -1732584194, 271733878];
+    let i: number;
+    for (i = 64; i <= n; i += 64) {
+      md5cycle(state, md5blk(s.substring(i - 64, i)));
+    }
+    s = s.substring(i - 64);
+    const tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (i = 0; i < s.length; i++) tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3);
+    tail[i >> 2] |= 0x80 << ((i % 4) << 3);
+    if (i > 55) { md5cycle(state, tail); for (i = 0; i < 16; i++) tail[i] = 0; }
+    tail[14] = n * 8;
+    md5cycle(state, tail);
+    return state;
+  }
+  function md5blk(s: string) {
+    const md5blks: number[] = [];
+    for (let i = 0; i < 64; i += 4) {
+      md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
+    }
+    return md5blks;
+  }
+  const hex_chr = '0123456789abcdef'.split('');
+  function rhex(n: number) {
+    let s = '';
+    for (let j = 0; j < 4; j++) s += hex_chr[(n >> (j * 8 + 4)) & 0x0f] + hex_chr[(n >> (j * 8)) & 0x0f];
+    return s;
+  }
+  function add32(a: number, b: number) { return (a + b) & 0xFFFFFFFF; }
+  function hex(x: number[]) { return x.map(v => rhex(v)).join(''); }
+  return hex(md51(string));
+}
 
 // --- Fix #5: Order number generated once via useRef ---
 // --- Fix #6: size prop guarded with default ---
@@ -366,7 +483,8 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
     email: "",
     name: "",
   });
-  const orderNumber = useRef(`#BS-${Math.random().toString(36).substr(2, 8).toUpperCase()}`);
+  const [signature, setSignature] = useState('');
+  const orderNumber = useRef(`BS-${Math.random().toString(36).substr(2, 8).toUpperCase()}`);
   const modalRef = useRef<HTMLDivElement>(null);
 
   const stableOnClose = useCallback(onClose, [onClose]);
@@ -411,8 +529,30 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
 
   const handlePayFastSubmit = () => {
     setIsProcessing(true);
-    // Submit the hidden PayFast form to redirect to PayFast's payment page
-    payfastFormRef.current?.submit();
+
+    // Build the PayFast parameter object in the exact order PayFast expects
+    const pfData: Record<string, string> = {
+      merchant_id: PAYFAST_CONFIG.merchant_id,
+      merchant_key: PAYFAST_CONFIG.merchant_key,
+      return_url: PAYFAST_CONFIG.return_url,
+      cancel_url: PAYFAST_CONFIG.cancel_url,
+      ...(PAYFAST_CONFIG.notify_url ? { notify_url: PAYFAST_CONFIG.notify_url } : {}),
+      name_first: formData.name.split(' ')[0] || '',
+      name_last: formData.name.split(' ').slice(1).join(' ') || '',
+      email_address: formData.email,
+      m_payment_id: orderNumber.current,
+      amount: product.price.toFixed(2),
+      item_name: `${product.name} - Size ${size}`,
+    };
+
+    // Generate and set the signature, then submit on next render
+    const sig = generatePayFastSignature(pfData, PAYFAST_CONFIG.passphrase || undefined);
+    setSignature(sig);
+
+    // Use requestAnimationFrame to ensure the signature input is rendered before submit
+    requestAnimationFrame(() => {
+      payfastFormRef.current?.submit();
+    });
   };
 
   return (
@@ -420,7 +560,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -433,7 +573,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
         exit={{ scale: 0.9, y: 50 }}
         transition={{ type: "spring", damping: 25 }}
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-lg bg-gray-900 rounded-3xl overflow-hidden border border-gray-800 shadow-2xl"
+        className="w-full max-w-lg bg-gray-900 rounded-t-3xl sm:rounded-3xl overflow-hidden border border-gray-800 shadow-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
       >
         <div className="relative">
           <button
@@ -444,7 +584,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
             <X className="w-5 h-5" />
           </button>
 
-          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 p-8 text-center">
+          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 p-5 sm:p-8 text-center">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -465,7 +605,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
             </p>
           </div>
 
-          <div className="px-8 py-2 bg-gray-800">
+          <div className="px-5 sm:px-8 py-2 bg-gray-800">
             <div className="flex items-center justify-between">
               {[1, 2, 3].map((s) => (
                 <div key={s} className="flex items-center">
@@ -487,7 +627,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
           </div>
         </div>
 
-        <div className="p-8">
+        <div className="p-5 sm:p-8">
           {step === 1 && (
             <motion.form
               initial={{ opacity: 0, x: 20 }}
@@ -585,6 +725,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
                 <input type="hidden" name="m_payment_id" value={orderNumber.current} />
                 <input type="hidden" name="amount" value={product.price.toFixed(2)} />
                 <input type="hidden" name="item_name" value={`${product.name} - Size ${size}`} />
+                {signature && <input type="hidden" name="signature" value={signature} />}
               </form>
 
               <button
@@ -724,10 +865,10 @@ const Newsletter = () => {
 
 const Footer = () => {
   return (
-    <footer className="bg-black border-t border-gray-800 py-16 px-6">
+    <footer className="bg-black border-t border-gray-800 py-10 sm:py-16 px-4 sm:px-6">
       <div className="max-w-7xl mx-auto">
-        <div className="grid md:grid-cols-4 gap-12 mb-12">
-          <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-12 mb-12">
+          <div className="col-span-2 md:col-span-1 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl overflow-hidden">
                 <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-full h-full object-contain" />
@@ -757,7 +898,9 @@ const Footer = () => {
             </ul>
           </div>
 
-          <Newsletter />
+          <div className="col-span-2 md:col-span-1">
+            <Newsletter />
+          </div>
         </div>
 
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -783,7 +926,7 @@ const FloatingCart = ({ onClick, count }: { onClick: () => void; count: number }
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.9 }}
       onClick={onClick}
-      className="fixed bottom-8 right-8 z-40 w-16 h-16 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-2xl shadow-purple-500/25 flex items-center justify-center"
+      className="fixed bottom-5 right-5 sm:bottom-8 sm:right-8 z-40 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-2xl shadow-purple-500/25 flex items-center justify-center"
     >
       <ShoppingBag className="w-6 h-6" />
       {count > 0 && (
@@ -802,6 +945,67 @@ const FloatingCart = ({ onClick, count }: { onClick: () => void; count: number }
 // --- Fix #3: Single source of truth for cart state, lifted to App ---
 // --- Fix #4: cartCount setter is now available and wired up ---
 // --- Fix #6: Modal only renders when selectedSize is truthy (no null assertion needed) ---
+// Detect PayFast return URL params
+const PaymentReturnBanner = () => {
+  const [status, setStatus] = useState<'success' | 'cancelled' | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    if (payment === 'success') setStatus('success');
+    else if (payment === 'cancelled') setStatus('cancelled');
+
+    // Clean up URL params after reading
+    if (payment) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('payment');
+      window.history.replaceState({}, '', url.pathname);
+    }
+  }, []);
+
+  if (!status) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: -50 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -50 }}
+        className="fixed top-4 left-4 right-4 z-50 mx-auto max-w-md"
+      >
+        <div className={cn(
+          "p-4 rounded-2xl border shadow-2xl backdrop-blur-lg flex items-center gap-3",
+          status === 'success'
+            ? "bg-green-500/20 border-green-500/30 text-green-400"
+            : "bg-orange-500/20 border-orange-500/30 text-orange-400"
+        )}>
+          {status === 'success' ? (
+            <Check className="w-6 h-6 flex-shrink-0" />
+          ) : (
+            <X className="w-6 h-6 flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm">
+              {status === 'success' ? 'Payment Successful!' : 'Payment Cancelled'}
+            </p>
+            <p className="text-xs opacity-75">
+              {status === 'success'
+                ? 'Your order has been placed. Check your email for confirmation.'
+                : 'Your payment was cancelled. No charges were made.'}
+            </p>
+          </div>
+          <button
+            onClick={() => setStatus(null)}
+            className="flex-shrink-0 p-1 rounded-full hover:bg-white/10"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 export default function App() {
   const [showCart, setShowCart] = useState(false);
   const [cartCount, setCartCount] = useState(0);
@@ -820,6 +1024,8 @@ export default function App() {
 
   return (
     <div className="bg-black min-h-screen">
+      <PaymentReturnBanner />
+
       <motion.div
         className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 z-50 origin-left"
         style={{ scaleX }}
