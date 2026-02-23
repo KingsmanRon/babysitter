@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
-import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, Shield, Send } from 'lucide-react';
+import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, Shield, Send, Volume2, VolumeX } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
@@ -23,6 +23,7 @@ const PRODUCT = {
 // --- Fix #1: Video play/pause now calls .play()/.pause() on the element ---
 const VideoSection = () => {
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { scrollYProgress } = useScroll();
   const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.8]);
@@ -39,6 +40,13 @@ const VideoSection = () => {
     setIsPlaying(!isPlaying);
   };
 
+  const toggleMute = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+    setIsMuted(video.muted);
+  };
+
   return (
     <section className="relative h-screen w-full overflow-hidden bg-black">
       <motion.div
@@ -49,11 +57,11 @@ const VideoSection = () => {
         <video
           ref={videoRef}
           autoPlay
+          muted
           loop
           playsInline
-          controls
           aria-label="Promotional video showcasing BABYSITTER clothing and accessories"
-          className="w-full h-full object-cover opacity-60"
+          className="w-full h-full object-cover opacity-80"
         >
           <source src={PRODUCT.video} type="video/mp4" />
         </video>
@@ -102,22 +110,39 @@ const VideoSection = () => {
           </motion.p>
         </motion.div>
 
-        <motion.button
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 1.5 }}
-          onClick={togglePlay}
-          className="group relative flex items-center gap-2 sm:gap-3 px-5 sm:px-8 py-3 sm:py-4 bg-white/10 backdrop-blur-lg rounded-full border border-white/20 hover:bg-white/20 transition-all duration-300"
-        >
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white flex items-center justify-center group-hover:scale-110 transition-transform">
-            {isPlaying ? (
-              <Pause className="w-5 h-5 text-black fill-current" />
+        <div className="flex items-center gap-3">
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 1.5 }}
+            onClick={togglePlay}
+            className="group relative flex items-center gap-2 sm:gap-3 px-5 sm:px-8 py-3 sm:py-4 bg-white/10 backdrop-blur-lg rounded-full border border-white/20 hover:bg-white/20 transition-all duration-300"
+          >
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white flex items-center justify-center group-hover:scale-110 transition-transform">
+              {isPlaying ? (
+                <Pause className="w-5 h-5 text-black fill-current" />
+              ) : (
+                <Play className="w-5 h-5 text-black fill-current ml-1" />
+              )}
+            </div>
+            <span className="text-white font-medium">{isPlaying ? "Pause" : "Play"} Video</span>
+          </motion.button>
+
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 1.7 }}
+            onClick={toggleMute}
+            className="group w-12 h-12 sm:w-14 sm:h-14 bg-white/10 backdrop-blur-lg rounded-full border border-white/20 hover:bg-white/20 transition-all duration-300 flex items-center justify-center"
+            aria-label={isMuted ? "Unmute video" : "Mute video"}
+          >
+            {isMuted ? (
+              <VolumeX className="w-5 h-5 text-white" />
             ) : (
-              <Play className="w-5 h-5 text-black fill-current ml-1" />
+              <Volume2 className="w-5 h-5 text-white" />
             )}
-          </div>
-          <span className="text-white font-medium">{isPlaying ? "Pause" : "Play"} Video</span>
-        </motion.button>
+          </motion.button>
+        </div>
       </motion.div>
 
       <motion.div
