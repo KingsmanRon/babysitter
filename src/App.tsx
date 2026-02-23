@@ -87,9 +87,9 @@ const VideoSection = () => {
             transition={{ type: "spring", stiffness: 100, delay: 0.8 }}
             className="mb-6"
           >
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-white flex items-center justify-center animate-pulse">
-              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-white flex items-center justify-center overflow-hidden">
-                <img src="/media/logo2.jpeg" alt="BABYSITTER logo" className="w-[5.25rem] h-[5.25rem] sm:w-[7.5rem] sm:h-[7.5rem] object-cover rounded-full" />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white flex items-center justify-center animate-pulse">
+              <div className="w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] rounded-full bg-white flex items-center justify-center overflow-hidden">
+                <img src="/media/logo2.jpeg" alt="BABYSITTER logo" className="w-[7rem] h-[7rem] sm:w-[10rem] sm:h-[10rem] object-cover rounded-full" />
               </div>
             </div>
           </motion.div>
@@ -905,11 +905,9 @@ const Footer = () => {
     <footer className="bg-black border-t border-gray-800 py-10 sm:py-16 px-4 sm:px-6">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-12 mb-12">
-          <div className="col-span-2 md:col-span-1 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl overflow-hidden">
-                <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-full h-full object-contain" />
-              </div>
+          <div className="col-span-2 md:col-span-1 space-y-4 flex flex-col items-center">
+            <div className="w-16 h-16 rounded-xl overflow-hidden">
+              <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-full h-full object-contain" />
             </div>
             <p className="text-gray-500">Clothing & accessories for the bold.</p>
           </div>
