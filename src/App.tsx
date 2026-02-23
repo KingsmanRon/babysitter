@@ -5,20 +5,20 @@ import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
 
 const PRODUCT = {
-  name: "LUNA™ Edge Sneakers",
-  price: 299,
-  description: "Revolutionary footwear engineered for the future. Featuring adaptive cushioning technology and sustainable materials.",
-  video: "https://assets.mixkit.co/videos/preview/mixkit-woman-running-at-sunset-4152-large.mp4",
+  name: "BABYSITTER™ Essentials Jacket",
+  price: 249,
+  description: "Premium streetwear crafted for everyday confidence. Featuring tailored fits, breathable fabrics, and timeless style for any occasion.",
+  video: "https://assets.mixkit.co/videos/preview/mixkit-young-woman-modeling-in-front-of-a-white-background-39880-large.mp4",
   images: [
-    "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80",
-    "https://images.unsplash.com/photo-1608231387042-66d1773070a5?w=800&q=80",
-    "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?w=800&q=80"
+    "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800&q=80",
+    "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&q=80",
+    "https://images.unsplash.com/photo-1544022613-e87ca75a784a?w=800&q=80"
   ],
-  sizes: ["US 6", "US 7", "US 8", "US 9", "US 10", "US 11"],
+  sizes: ["XS", "S", "M", "L", "XL", "XXL"],
   features: [
-    { icon: Zap, title: "Adaptive Cushioning", desc: "Smart foam responds to your stride" },
-    { icon: Shield, title: "Water Resistant", desc: "Stay dry in any condition" },
-    { icon: Star, title: "Premium Materials", desc: "Made from recycled ocean plastic" }
+    { icon: Zap, title: "Tailored Fit", desc: "Precision cut for a flattering silhouette" },
+    { icon: Shield, title: "All-Season Wear", desc: "Versatile layers for any weather" },
+    { icon: Star, title: "Premium Fabrics", desc: "Sustainably sourced quality materials" }
   ]
 };
 
@@ -54,7 +54,7 @@ const VideoSection = () => {
           muted
           loop
           playsInline
-          aria-label="Promotional video showcasing LUNA Edge Sneakers"
+          aria-label="Promotional video showcasing BABYSITTER clothing and accessories"
           className="w-full h-full object-cover opacity-60"
         >
           <source src={PRODUCT.video} type="video/mp4" />
@@ -78,7 +78,7 @@ const VideoSection = () => {
           <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center animate-pulse">
             <div className="w-28 h-28 rounded-full bg-black flex items-center justify-center">
               <span className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                L
+                BS
               </span>
             </div>
           </div>
@@ -86,7 +86,7 @@ const VideoSection = () => {
 
         <h1 className="text-6xl md:text-8xl lg:text-9xl font-black text-white mb-4 tracking-tighter">
           <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
-            LUNA
+            BABYSITTER
           </span>
           <span className="text-white/80">™</span>
         </h1>
@@ -97,7 +97,7 @@ const VideoSection = () => {
           transition={{ delay: 1.2 }}
           className="text-xl md:text-2xl text-gray-300 mb-12 max-w-2xl"
         >
-          The future of footwear is here
+          Clothing & accessories for the bold
         </motion.p>
 
         <motion.button
@@ -390,7 +390,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
     expiry: "",
     cvc: ""
   });
-  const orderNumber = useRef(`#LN-${Math.random().toString(36).substr(2, 8).toUpperCase()}`);
+  const orderNumber = useRef(`#BS-${Math.random().toString(36).substr(2, 8).toUpperCase()}`);
   const modalRef = useRef<HTMLDivElement>(null);
 
   const stableOnClose = useCallback(onClose, [onClose]);
@@ -700,11 +700,11 @@ const Footer = () => {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
-                <span className="text-xl font-bold text-white">L</span>
+                <span className="text-xl font-bold text-white">BS</span>
               </div>
-              <span className="text-xl font-bold text-white">LUNA</span>
+              <span className="text-xl font-bold text-white">BABYSITTER</span>
             </div>
-            <p className="text-gray-500">Revolutionary footwear for the modern world.</p>
+            <p className="text-gray-500">Clothing & accessories for the bold.</p>
           </div>
 
           <div>
@@ -745,7 +745,7 @@ const Footer = () => {
 
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Fix #9a: Dynamic copyright year */}
-          <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} LUNA. All rights reserved.</p>
+          <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} BABYSITTER. All rights reserved.</p>
           <div className="flex items-center gap-4 text-gray-500 text-sm">
             <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
