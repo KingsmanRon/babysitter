@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
-import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, CreditCard, Shield, Zap, Star } from 'lucide-react';
+import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, CreditCard, Shield, Send } from 'lucide-react';
+import emailjs from '@emailjs/browser';
 import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
 
@@ -8,18 +9,14 @@ const PRODUCT = {
   name: "BABYSITTER™ Essentials Jacket",
   price: 249,
   description: "Premium streetwear crafted for everyday confidence. Featuring tailored fits, breathable fabrics, and timeless style for any occasion.",
-  video: "https://assets.mixkit.co/videos/preview/mixkit-young-woman-modeling-in-front-of-a-white-background-39880-large.mp4",
+  video: "/media/promovid.MP4",
   images: [
-    "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800&q=80",
-    "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&q=80",
-    "https://images.unsplash.com/photo-1544022613-e87ca75a784a?w=800&q=80"
+    "/media/boy.jpeg",
+    "/media/girl.jpeg",
+    "/media/pinkracer.jpeg",
+    "/media/greenracer.jpeg"
   ],
   sizes: ["XS", "S", "M", "L", "XL", "XXL"],
-  features: [
-    { icon: Zap, title: "Tailored Fit", desc: "Precision cut for a flattering silhouette" },
-    { icon: Shield, title: "All-Season Wear", desc: "Versatile layers for any weather" },
-    { icon: Star, title: "Premium Fabrics", desc: "Sustainably sourced quality materials" }
-  ]
 };
 
 // --- Fix #1: Video play/pause now calls .play()/.pause() on the element ---
@@ -76,10 +73,8 @@ const VideoSection = () => {
           className="mb-6"
         >
           <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center animate-pulse">
-            <div className="w-28 h-28 rounded-full bg-black flex items-center justify-center">
-              <span className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                BS
-              </span>
+            <div className="w-28 h-28 rounded-full bg-black flex items-center justify-center overflow-hidden">
+              <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-20 h-20 object-contain" />
             </div>
           </div>
         </motion.div>
@@ -291,21 +286,6 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
               initial={{ opacity: 0, y: 20 }}
               animate={inView ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.7 }}
-              className="grid grid-cols-3 gap-4"
-            >
-              {PRODUCT.features.map((feature, idx) => (
-                <div key={idx} className="p-4 rounded-xl bg-gray-800/50 border border-gray-700/50">
-                  <feature.icon className="w-8 h-8 text-purple-400 mb-2" />
-                  <h3 className="text-white font-semibold text-sm">{feature.title}</h3>
-                  <p className="text-gray-500 text-xs mt-1">{feature.desc}</p>
-                </div>
-              ))}
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.8 }}
               className="space-y-4"
             >
               <motion.button
@@ -692,15 +672,81 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
   );
 };
 
+const Newsletter = () => {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setStatus('sending');
+
+    try {
+      await emailjs.send(
+        'service_babysitter',
+        'template_newsletter',
+        {
+          subscriber_email: email,
+          to_email: 'babysitterbs9@gmail.com',
+          message: `New newsletter subscriber: ${email}`,
+        },
+        'YOUR_EMAILJS_PUBLIC_KEY'
+      );
+      setStatus('sent');
+      setEmail('');
+      setTimeout(() => setStatus('idle'), 3000);
+    } catch {
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
+  };
+
+  return (
+    <div>
+      <h4 className="text-white font-semibold mb-4">Newsletter</h4>
+      <p className="text-gray-500 mb-4">Get exclusive offers and product updates</p>
+      <form onSubmit={handleSubscribe} className="flex gap-2">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Enter email"
+          className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+        />
+        <button
+          type="submit"
+          disabled={status === 'sending'}
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+        >
+          {status === 'sending' ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : status === 'sent' ? (
+            <Check className="w-5 h-5" />
+          ) : (
+            <Send className="w-5 h-5" />
+          )}
+        </button>
+      </form>
+      {status === 'sent' && (
+        <p className="text-green-400 text-sm mt-2">Subscribed successfully!</p>
+      )}
+      {status === 'error' && (
+        <p className="text-red-400 text-sm mt-2">Something went wrong. Try again.</p>
+      )}
+    </div>
+  );
+};
+
 const Footer = () => {
   return (
     <footer className="bg-black border-t border-gray-800 py-16 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
-                <span className="text-xl font-bold text-white">BS</span>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl overflow-hidden">
+                <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-full h-full object-contain" />
               </div>
               <span className="text-xl font-bold text-white">BABYSITTER</span>
             </div>
@@ -727,20 +773,7 @@ const Footer = () => {
             </ul>
           </div>
 
-          <div>
-            <h4 className="text-white font-semibold mb-4">Newsletter</h4>
-            <p className="text-gray-500 mb-4">Get exclusive offers and product updates</p>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                placeholder="Enter email"
-                className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-              />
-              <button className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
+          <Newsletter />
         </div>
 
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
