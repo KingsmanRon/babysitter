@@ -87,8 +87,8 @@ const VideoSection = () => {
             transition={{ type: "spring", stiffness: 100, delay: 0.8 }}
             className="mb-6"
           >
-            <div className="w-36 h-36 sm:w-48 sm:h-48 rounded-full bg-white flex items-center justify-center animate-pulse">
-              <div className="w-30 h-30 sm:w-42 sm:h-42 rounded-full bg-white flex items-center justify-center overflow-hidden">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-white flex items-center justify-center animate-pulse">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-white flex items-center justify-center overflow-hidden">
                 <img src="/media/logo2.jpeg" alt="BABYSITTER logo" className="w-[5.25rem] h-[5.25rem] sm:w-[7.5rem] sm:h-[7.5rem] object-cover rounded-full" />
               </div>
             </div>
