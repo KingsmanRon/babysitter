@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
-import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, CreditCard, Shield, Send } from 'lucide-react';
+import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, Shield, Send } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
 
 const PRODUCT = {
-  name: "BABYSITTER™ Essentials Jacket",
+  name: "BABYSITTER™",
   price: 249,
   description: "Premium streetwear crafted for everyday confidence. Featuring tailored fits, breathable fabrics, and timeless style for any occasion.",
   video: "/media/promovid.MP4",
@@ -234,8 +234,8 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                   {PRODUCT.name}
                 </h2>
                 <div className="flex items-center gap-4 mt-4">
-                  <span className="text-4xl font-bold text-white">${PRODUCT.price}</span>
-                  <span className="text-xl text-gray-500 line-through">$450</span>
+                  <span className="text-4xl font-bold text-white">R{PRODUCT.price}</span>
+                  <span className="text-xl text-gray-500 line-through">R450</span>
                   <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
                     33% OFF
                   </span>
@@ -322,7 +322,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                 ) : (
                   <>
                     <ShoppingBag className="w-6 h-6" />
-                    {selectedSize ? `Add to Cart - $${PRODUCT.price}` : "Select a Size"}
+                    {selectedSize ? `Add to Cart - R${PRODUCT.price}` : "Select a Size"}
                   </>
                 )}
               </motion.button>
@@ -333,8 +333,8 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                   <span>Secure Checkout</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4" />
-                  <span>Stripe Payment</span>
+                  <Shield className="w-4 h-4" />
+                  <span>PayFast Payment</span>
                 </div>
               </div>
             </motion.div>
@@ -345,22 +345,15 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
   );
 };
 
-// --- Fix #7: Payment field formatting helpers ---
-const formatCardNumber = (value: string) => {
-  const digits = value.replace(/\D/g, '');
-  return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-};
-
-const formatExpiry = (value: string) => {
-  const digits = value.replace(/\D/g, '');
-  if (digits.length >= 2) {
-    return digits.slice(0, 2) + '/' + digits.slice(2, 4);
-  }
-  return digits;
-};
-
-const formatCvc = (value: string) => {
-  return value.replace(/\D/g, '');
+// PayFast configuration
+const PAYFAST_CONFIG = {
+  merchant_id: '10000100',       // Replace with your PayFast Merchant ID
+  merchant_key: '46f0cd694581a',  // Replace with your PayFast Merchant Key
+  // Use sandbox for testing, switch to www.payfast.co.za for production
+  action_url: 'https://sandbox.payfast.co.za/eng/process',
+  return_url: window.location.origin,  // Redirect after successful payment
+  cancel_url: window.location.origin,  // Redirect if payment is cancelled
+  notify_url: '',                       // Your server ITN endpoint (set when you have a backend)
 };
 
 // --- Fix #5: Order number generated once via useRef ---
@@ -372,9 +365,6 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
   const [formData, setFormData] = useState({
     email: "",
     name: "",
-    cardNumber: "",
-    expiry: "",
-    cvc: ""
   });
   const orderNumber = useRef(`#BS-${Math.random().toString(36).substr(2, 8).toUpperCase()}`);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -417,14 +407,12 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [step, stableOnClose]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const payfastFormRef = useRef<HTMLFormElement>(null);
+
+  const handlePayFastSubmit = () => {
     setIsProcessing(true);
-
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    setIsProcessing(false);
-    setStep(3);
+    // Submit the hidden PayFast form to redirect to PayFast's payment page
+    payfastFormRef.current?.submit();
   };
 
   return (
@@ -540,10 +528,9 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
           )}
 
           {step === 2 && (
-            <motion.form
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              onSubmit={handleSubmit}
               className="space-y-4"
             >
               <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700 mb-6">
@@ -552,78 +539,69 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
                   <div className="flex-1">
                     <h3 className="font-semibold text-white">{product.name}</h3>
                     <p className="text-gray-400 text-sm">Size: {size}</p>
-                    <p className="text-purple-400 font-bold mt-1">${product.price}</p>
+                    <p className="text-purple-400 font-bold mt-1">R{product.price}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Fix #7: Payment fields with inputMode="numeric" and auto-formatting */}
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Card Number</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[\d ]{13,19}"
-                    required
-                    value={formData.cardNumber}
-                    onChange={(e) => setFormData({...formData, cardNumber: formatCardNumber(e.target.value)})}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
-                    placeholder="4242 4242 4242 4242"
-                    maxLength={19}
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1">
-                    <div className="w-8 h-5 bg-blue-600 rounded-sm" />
-                    <div className="w-8 h-5 bg-red-500 rounded-sm -ml-3" />
-                  </div>
+              <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700 space-y-2">
+                <div className="flex justify-between text-gray-400">
+                  <span>Subtotal</span>
+                  <span>R{product.price}</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>Shipping</span>
+                  <span className="text-green-400">Free</span>
+                </div>
+                <div className="border-t border-gray-700 pt-2 flex justify-between text-white font-bold">
+                  <span>Total</span>
+                  <span>R{product.price}</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Expiry Date</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="\d{2}/\d{2}"
-                    required
-                    value={formData.expiry}
-                    onChange={(e) => setFormData({...formData, expiry: formatExpiry(e.target.value)})}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
-                    placeholder="MM/YY"
-                    maxLength={5}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">CVC</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="\d{3,4}"
-                    required
-                    value={formData.cvc}
-                    onChange={(e) => setFormData({...formData, cvc: formatCvc(e.target.value)})}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
-                    placeholder="123"
-                    maxLength={4}
-                  />
-                </div>
+              <div className="p-4 bg-purple-500/10 rounded-xl border border-purple-500/20 text-center">
+                <p className="text-gray-300 text-sm">
+                  You'll be redirected to <span className="text-purple-400 font-semibold">PayFast</span> to complete your payment securely.
+                </p>
               </div>
+
+              {/* Hidden PayFast form — submits directly to PayFast's hosted payment page */}
+              <form
+                ref={payfastFormRef}
+                action={PAYFAST_CONFIG.action_url}
+                method="POST"
+                className="hidden"
+              >
+                <input type="hidden" name="merchant_id" value={PAYFAST_CONFIG.merchant_id} />
+                <input type="hidden" name="merchant_key" value={PAYFAST_CONFIG.merchant_key} />
+                <input type="hidden" name="return_url" value={PAYFAST_CONFIG.return_url} />
+                <input type="hidden" name="cancel_url" value={PAYFAST_CONFIG.cancel_url} />
+                {PAYFAST_CONFIG.notify_url && (
+                  <input type="hidden" name="notify_url" value={PAYFAST_CONFIG.notify_url} />
+                )}
+                <input type="hidden" name="name_first" value={formData.name.split(' ')[0] || ''} />
+                <input type="hidden" name="name_last" value={formData.name.split(' ').slice(1).join(' ') || ''} />
+                <input type="hidden" name="email_address" value={formData.email} />
+                <input type="hidden" name="m_payment_id" value={orderNumber.current} />
+                <input type="hidden" name="amount" value={product.price.toFixed(2)} />
+                <input type="hidden" name="item_name" value={`${product.name} - Size ${size}`} />
+              </form>
 
               <button
-                type="submit"
+                type="button"
+                onClick={handlePayFastSubmit}
                 disabled={isProcessing}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isProcessing ? (
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Processing...
+                    Redirecting to PayFast...
                   </div>
                 ) : (
                   <>
-                    <CreditCard className="w-5 h-5 inline-block mr-2" />
-                    Pay ${product.price}
+                    <Shield className="w-5 h-5 inline-block mr-2" />
+                    Pay R{product.price} with PayFast
                   </>
                 )}
               </button>
@@ -635,7 +613,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
               >
                 ← Back
               </button>
-            </motion.form>
+            </motion.div>
           )}
 
           {step === 3 && (
@@ -661,7 +639,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
 
               <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
                 <Shield className="w-4 h-4" />
-                <span>Protected by Stripe</span>
+                <span>Protected by PayFast</span>
               </div>
 
               <button
