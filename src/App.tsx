@@ -279,92 +279,96 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
               {PRODUCT.description}
             </motion.p>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.5 }}
-              className="space-y-4"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-white font-medium">Select Size</span>
-                <button className="text-purple-400 text-sm underline hover:text-purple-300">
-                  Size Guide
-                </button>
-              </div>
+            {currentImage !== 0 && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={inView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ delay: 0.5 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-medium">Select Size</span>
+                    <button className="text-purple-400 text-sm underline hover:text-purple-300">
+                      Size Guide
+                    </button>
+                  </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                {PRODUCT.sizes.map((size, idx) => (
+                  <div className="grid grid-cols-3 gap-3">
+                    {PRODUCT.sizes.map((size, idx) => (
+                      <motion.button
+                        key={size}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={inView ? { opacity: 1, scale: 1 } : {}}
+                        transition={{ delay: 0.5 + idx * 0.05 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setSelectedSize(size)}
+                        className={cn(
+                          "py-4 rounded-xl border-2 font-semibold text-lg transition-all duration-300",
+                          selectedSize === size
+                            ? "border-purple-500 bg-purple-500/20 text-white scale-105"
+                            : "border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600"
+                        )}
+                      >
+                        {size}
+                      </motion.button>
+                    ))}
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={inView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ delay: 0.7 }}
+                  className="space-y-4"
+                >
                   <motion.button
-                    key={size}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={inView ? { opacity: 1, scale: 1 } : {}}
-                    transition={{ delay: 0.5 + idx * 0.05 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedSize(size)}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      if (selectedSize) {
+                        setIsAdded(true);
+                        addToCartTimeoutRef.current = setTimeout(() => {
+                          onAddToCart();
+                          setIsAdded(false);
+                        }, 1000);
+                      }
+                    }}
+                    disabled={!selectedSize}
                     className={cn(
-                      "py-4 rounded-xl border-2 font-semibold text-lg transition-all duration-300",
-                      selectedSize === size
-                        ? "border-purple-500 bg-purple-500/20 text-white scale-105"
-                        : "border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600"
+                      "w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300",
+                      selectedSize
+                        ? "bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white hover:shadow-2xl hover:shadow-purple-500/25"
+                        : "bg-gray-700 text-gray-500 cursor-not-allowed"
                     )}
                   >
-                    {size}
+                    {isAdded ? (
+                      <>
+                        <Check className="w-6 h-6" />
+                        Added to Cart!
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingBag className="w-6 h-6" />
+                        {selectedSize ? `Add to Cart - R${PRODUCT.price}` : "Select a Size"}
+                      </>
+                    )}
                   </motion.button>
-                ))}
-              </div>
-            </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.7 }}
-              className="space-y-4"
-            >
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  if (selectedSize) {
-                    setIsAdded(true);
-                    addToCartTimeoutRef.current = setTimeout(() => {
-                      onAddToCart();
-                      setIsAdded(false);
-                    }, 1000);
-                  }
-                }}
-                disabled={!selectedSize}
-                className={cn(
-                  "w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300",
-                  selectedSize
-                    ? "bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white hover:shadow-2xl hover:shadow-purple-500/25"
-                    : "bg-gray-700 text-gray-500 cursor-not-allowed"
-                )}
-              >
-                {isAdded ? (
-                  <>
-                    <Check className="w-6 h-6" />
-                    Added to Cart!
-                  </>
-                ) : (
-                  <>
-                    <ShoppingBag className="w-6 h-6" />
-                    {selectedSize ? `Add to Cart - R${PRODUCT.price}` : "Select a Size"}
-                  </>
-                )}
-              </motion.button>
-
-              <div className="flex items-center justify-center gap-6 text-gray-500 text-sm">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  <span>Secure Checkout</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  <span>PayFast Payment</span>
-                </div>
-              </div>
-            </motion.div>
+                  <div className="flex items-center justify-center gap-6 text-gray-500 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
+                      <span>Secure Checkout</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
+                      <span>PayFast Payment</span>
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            )}
           </motion.div>
         </div>
       </div>
