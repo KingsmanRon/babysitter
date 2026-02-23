@@ -11,6 +11,7 @@ const PRODUCT = {
   description: "Premium streetwear crafted for everyday confidence. Featuring tailored fits, breathable fabrics, and timeless style for any occasion.",
   video: "/media/promovid.MP4",
   images: [
+    "/media/boygirl.jpeg",
     "/media/boy.jpeg",
     "/media/girl.jpeg",
     "/media/pinkracer.jpeg",
