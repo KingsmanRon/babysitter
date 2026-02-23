@@ -236,7 +236,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                     currentImage === idx ? "border-purple-500" : "border-transparent opacity-50 hover:opacity-100"
                   )}
                 >
-                  <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+                  <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover rounded-xl border-2 border-black" />
                 </motion.button>
               ))}
             </div>
