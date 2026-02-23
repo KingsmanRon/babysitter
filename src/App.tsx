@@ -87,9 +87,9 @@ const VideoSection = () => {
             transition={{ type: "spring", stiffness: 100, delay: 0.8 }}
             className="mb-6"
           >
-            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-white flex items-center justify-center animate-pulse">
-              <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-white flex items-center justify-center overflow-hidden">
-                <img src="/media/logo2.jpeg" alt="BABYSITTER logo" className="w-14 h-14 sm:w-20 sm:h-20 object-cover rounded-full" />
+            <div className="w-36 h-36 sm:w-48 sm:h-48 rounded-full bg-white flex items-center justify-center animate-pulse">
+              <div className="w-30 h-30 sm:w-42 sm:h-42 rounded-full bg-white flex items-center justify-center overflow-hidden">
+                <img src="/media/logo2.jpeg" alt="BABYSITTER logo" className="w-[5.25rem] h-[5.25rem] sm:w-[7.5rem] sm:h-[7.5rem] object-cover rounded-full" />
               </div>
             </div>
           </motion.div>
@@ -910,7 +910,6 @@ const Footer = () => {
               <div className="w-10 h-10 rounded-xl overflow-hidden">
                 <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-full h-full object-contain" />
               </div>
-              <span className="text-xl font-bold text-white">BABYSITTER</span>
             </div>
             <p className="text-gray-500">Clothing & accessories for the bold.</p>
           </div>
