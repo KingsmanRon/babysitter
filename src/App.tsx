@@ -13,8 +13,8 @@ const PRODUCT = {
   images: [
     "/media/boygirl.jpeg",
     "/media/boy.jpeg",
-    "/media/girl.jpeg",
     "/media/pinkracer.jpeg",
+    "/media/girl.jpeg",
     "/media/greenracer.jpeg"
   ],
   sizes: ["XS", "S", "M", "L", "XL", "XXL"],
