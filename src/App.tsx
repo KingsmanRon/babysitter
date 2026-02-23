@@ -49,9 +49,9 @@ const VideoSection = () => {
         <video
           ref={videoRef}
           autoPlay
-          muted
           loop
           playsInline
+          controls
           aria-label="Promotional video showcasing BABYSITTER clothing and accessories"
           className="w-full h-full object-cover opacity-60"
         >
