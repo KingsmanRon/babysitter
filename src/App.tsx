@@ -67,7 +67,7 @@ const VideoSection = () => {
         className="relative z-10 flex flex-col items-center justify-center h-full text-center px-6"
       >
         <motion.div
-          animate={{ opacity: isPlaying ? 0.08 : 1 }}
+          animate={{ opacity: isPlaying ? 0.02 : 1 }}
           transition={{ duration: 0.6 }}
           className="flex flex-col items-center"
         >
