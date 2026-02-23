@@ -6,8 +6,8 @@ import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
 
 const PRODUCT = {
-  name: "BABYSITTER™",
-  price: 249,
+  name: "BS X-Ray Motor-Cross Jersey",
+  price: 1499,
   description: "Premium streetwear crafted for everyday confidence. Featuring tailored fits, breathable fabrics, and timeless style for any occasion.",
   video: "/media/promovid.MP4",
   images: [
@@ -17,7 +17,7 @@ const PRODUCT = {
     "/media/girl.jpeg",
     "/media/greenracer.jpeg"
   ],
-  sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+  sizes: ["S", "M", "L"],
 };
 
 // --- Fix #1: Video play/pause now calls .play()/.pause() on the element ---
@@ -62,6 +62,7 @@ const VideoSection = () => {
           playsInline
           aria-label="Promotional video showcasing BABYSITTER clothing and accessories"
           className="w-full h-full object-cover opacity-90"
+          style={{ objectPosition: 'center 30%' }}
         >
           <source src={PRODUCT.video} type="video/mp4" />
         </video>
@@ -86,19 +87,12 @@ const VideoSection = () => {
             transition={{ type: "spring", stiffness: 100, delay: 0.8 }}
             className="mb-6"
           >
-            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center animate-pulse">
-              <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-black flex items-center justify-center overflow-hidden">
-                <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
+            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-white flex items-center justify-center animate-pulse">
+              <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-white flex items-center justify-center overflow-hidden">
+                <img src="/media/logo2.jpeg" alt="BABYSITTER logo" className="w-14 h-14 sm:w-20 sm:h-20 object-cover rounded-full" />
               </div>
             </div>
           </motion.div>
-
-          <h1 className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-black text-white mb-4 tracking-tighter">
-            <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
-              BABYSITTER
-            </span>
-            <span className="text-white/80">™</span>
-          </h1>
 
           <motion.p
             initial={{ opacity: 0 }}
@@ -106,7 +100,7 @@ const VideoSection = () => {
             transition={{ delay: 1.2 }}
             className="text-lg sm:text-xl md:text-2xl text-gray-300 mb-8 sm:mb-12 max-w-2xl"
           >
-            Clothing & Accessories for the <span className="font-black text-white">BOLD</span>
+            CHANGING THE WORLD ONE GARMENT AT A TIME
           </motion.p>
         </motion.div>
 
@@ -165,10 +159,11 @@ interface ProductSectionProps {
   selectedSize: string | null;
   setSelectedSize: (size: string | null) => void;
   onAddToCart: () => void;
+  currentImage: number;
+  setCurrentImage: (idx: number) => void;
 }
 
-const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductSectionProps) => {
-  const [currentImage, setCurrentImage] = useState(0);
+const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentImage, setCurrentImage }: ProductSectionProps) => {
   const [isAdded, setIsAdded] = useState(false);
   const addToCartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -262,10 +257,6 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                 </h2>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
                   <span className="text-3xl sm:text-4xl font-bold text-white">R{PRODUCT.price}</span>
-                  <span className="text-lg sm:text-xl text-gray-500 line-through">R450</span>
-                  <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
-                    33% OFF
-                  </span>
                 </div>
               </motion.div>
             </div>
@@ -507,7 +498,22 @@ function md5(string: string): string {
 // --- Fix #5: Order number generated once via useRef ---
 // --- Fix #6: size prop guarded with default ---
 // --- Fix #9c: Focus trapping in modal ---
-const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; size: string; onClose: () => void }) => {
+// Map catalog selection to the image shown in checkout step 2
+const getCheckoutImage = (currentImage: number): string => {
+  // boy.jpeg (index 1) → pinkracer.jpeg
+  // pinkracer.jpeg (index 2) → pinkracer.jpeg
+  // girl.jpeg (index 3) → greenracer.jpeg
+  // greenracer.jpeg (index 4) → greenracer.jpeg
+  const checkoutImageMap: Record<number, string> = {
+    1: '/media/pinkracer.jpeg',
+    2: '/media/pinkracer.jpeg',
+    3: '/media/greenracer.jpeg',
+    4: '/media/greenracer.jpeg',
+  };
+  return checkoutImageMap[currentImage] || PRODUCT.images[currentImage];
+};
+
+const CheckoutModal = ({ product, size, onClose, currentImage }: { product: typeof PRODUCT; size: string; onClose: () => void; currentImage: number }) => {
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [formData, setFormData] = useState({
@@ -706,7 +712,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
             >
               <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700 mb-6">
                 <div className="flex gap-4">
-                  <img src={product.images[0]} alt={product.name} className="w-20 h-20 rounded-lg object-cover" />
+                  <img src={getCheckoutImage(currentImage)} alt={product.name} className="w-20 h-20 rounded-lg object-cover" />
                   <div className="flex-1">
                     <h3 className="font-semibold text-white">{product.name}</h3>
                     <p className="text-gray-400 text-sm">Size: {size}</p>
@@ -1041,6 +1047,7 @@ export default function App() {
   const [showCart, setShowCart] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [currentImage, setCurrentImage] = useState(0);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
@@ -1067,6 +1074,8 @@ export default function App() {
         selectedSize={selectedSize}
         setSelectedSize={setSelectedSize}
         onAddToCart={handleAddToCart}
+        currentImage={currentImage}
+        setCurrentImage={setCurrentImage}
       />
       <Footer />
 
@@ -1078,6 +1087,7 @@ export default function App() {
             product={PRODUCT}
             size={selectedSize}
             onClose={() => setShowCart(false)}
+            currentImage={currentImage}
           />
         )}
       </AnimatePresence>
