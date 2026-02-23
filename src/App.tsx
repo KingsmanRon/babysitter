@@ -212,7 +212,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                 transition={{ duration: 0.5 }}
                 src={PRODUCT.images[currentImage]}
                 alt={PRODUCT.name}
-                className="w-full h-full object-contain relative z-10 rounded-xl border-2 border-black"
+                className="w-full h-full object-contain relative z-10 rounded-2xl border-2 border-black"
               />
 
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
