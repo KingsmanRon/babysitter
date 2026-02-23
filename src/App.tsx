@@ -217,7 +217,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
 
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
 
-              <div className="absolute top-6 right-6">
+              <div className="absolute top-6 right-6 z-20">
                 <div className="px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full text-white font-bold text-sm">
                   NEW
                 </div>
@@ -232,8 +232,8 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setCurrentImage(idx)}
                   className={cn(
-                    "flex-1 aspect-video rounded-xl overflow-hidden border-2 transition-all",
-                    currentImage === idx ? "border-purple-500" : "border-transparent opacity-50 hover:opacity-100"
+                    "flex-1 aspect-video rounded-xl overflow-hidden border-2 border-black transition-all",
+                    currentImage === idx ? "ring-2 ring-purple-500" : "opacity-50 hover:opacity-100"
                   )}
                 >
                   <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover rounded-xl border-2 border-black" />
