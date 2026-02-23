@@ -89,7 +89,7 @@ const VideoSection = () => {
           >
             <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-white flex items-center justify-center animate-pulse">
               <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-white flex items-center justify-center overflow-hidden">
-                <img src="/media/bs-logo.png" alt="BABYSITTER logo" className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
+                <img src="/media/logo2.jpeg" alt="BABYSITTER logo" className="w-14 h-14 sm:w-20 sm:h-20 object-cover rounded-full" />
               </div>
             </div>
           </motion.div>
