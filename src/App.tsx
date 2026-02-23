@@ -212,7 +212,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                 transition={{ duration: 0.5 }}
                 src={PRODUCT.images[currentImage]}
                 alt={PRODUCT.name}
-                className="w-full h-full object-contain relative z-10 rounded-2xl border-2 border-black"
+                className="w-full h-full object-contain relative z-10"
               />
 
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
@@ -236,7 +236,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                     currentImage === idx ? "border-purple-500" : "border-transparent opacity-50 hover:opacity-100"
                   )}
                 >
-                  <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+                  <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover rounded-xl border-2 border-black" />
                 </motion.button>
               ))}
             </div>
