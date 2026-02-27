@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { getOrder, updateOrderStatus, decrementStock } from '../lib/db.js';
 
 // PayFast server IP ranges (used for production IP validation)
 // See: https://developers.payfast.co.za/docs#step_5_confirm_payment
@@ -22,7 +23,7 @@ function isPayFastIP(ip: string): boolean {
   return PAYFAST_IP_RANGES.some(range => ipInCidr(ip, range));
 }
 
-export default function handler(
+export default async function handler(
   req: {
     method: string;
     body: Record<string, string>;
@@ -81,15 +82,29 @@ export default function handler(
   }
 
   // Step 3: Process payment status
-  // In production, verify the amount against your order database
   const paymentStatus = body.payment_status;
   const orderId = body.m_payment_id;
   const amountGross = body.amount_gross;
 
+  // Verify amount against stored order
+  const order = await getOrder(orderId);
+  if (order && parseFloat(amountGross) !== order.amount) {
+    console.warn(`[PayFast ITN] Amount mismatch for ${orderId}: expected ${order.amount}, got ${amountGross}`);
+    return res.status(400).json({ error: 'Amount mismatch' });
+  }
+
   if (paymentStatus === 'COMPLETE') {
-    // Payment confirmed — update your database/order system here
+    await updateOrderStatus(orderId, 'paid');
+    // Decrement stock for paid orders
+    if (order?.items?.length) {
+      await decrementStock(order.items);
+    }
     console.log(`[PayFast ITN] Payment COMPLETE: Order ${orderId}, Amount R${amountGross}`);
+  } else if (paymentStatus === 'CANCELLED') {
+    await updateOrderStatus(orderId, 'cancelled');
+    console.log(`[PayFast ITN] Payment CANCELLED: Order ${orderId}`);
   } else {
+    await updateOrderStatus(orderId, 'failed');
     console.log(`[PayFast ITN] Payment ${paymentStatus}: Order ${orderId}`);
   }
 

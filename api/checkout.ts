@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { saveOrder } from './lib/db.js';
 
 interface CheckoutRequest {
   email: string;
@@ -6,9 +7,10 @@ interface CheckoutRequest {
   amount: number;
   item_name: string;
   payment_id: string;
+  items?: { size: string; quantity: number }[];
 }
 
-export default function handler(
+export default async function handler(
   req: { method: string; body: CheckoutRequest; headers: Record<string, string | string[] | undefined> },
   res: {
     status: (code: number) => {
@@ -23,12 +25,26 @@ export default function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { email, name, amount, item_name, payment_id } = req.body;
+  const { email, name, amount, item_name, payment_id, items } = req.body;
 
   // Basic validation
   if (!email || !name || !amount || !item_name || !payment_id) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
+
+  // Save order as pending in database
+  const now = new Date().toISOString();
+  await saveOrder({
+    orderId: payment_id,
+    email,
+    name,
+    items: items || [],
+    amount,
+    itemName: item_name,
+    status: 'pending',
+    createdAt: now,
+    updatedAt: now,
+  });
 
   // Server-side credentials (never exposed to browser)
   const merchant_id = process.env.PAYFAST_MERCHANT_ID || '10000100';

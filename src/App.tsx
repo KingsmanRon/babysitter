@@ -20,8 +20,8 @@ type CartItem = { size: string; quantity: number };
 const MAX_QTY_PER_SIZE = 3;
 const MAX_CART_ITEMS = 9;
 
-// Stock per size (update manually or connect to backend later)
-const STOCK: Record<string, number> = { S: 10, M: 15, L: 10 };
+// Default stock (used as fallback while fetching from backend)
+const DEFAULT_STOCK: Record<string, number> = { S: 10, M: 15, L: 10 };
 
 const PRODUCT = {
   name: "BS X-Ray Motor-Cross Jersey",
@@ -279,9 +279,10 @@ interface ProductSectionProps {
   currentImage: number;
   setCurrentImage: (idx: number) => void;
   cart: CartItem[];
+  stock: Record<string, number>;
 }
 
-const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentImage, setCurrentImage, cart }: ProductSectionProps) => {
+const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentImage, setCurrentImage, cart, stock }: ProductSectionProps) => {
   const [isAdded, setIsAdded] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
   const addToCartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -302,9 +303,9 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentIma
   }, []);
 
   const getStockStatus = (size: string) => {
-    const stock = STOCK[size] || 0;
+    const sizeStock = stock[size] || 0;
     const inCart = cart.find(item => item.size === size)?.quantity || 0;
-    const remaining = stock - inCart;
+    const remaining = sizeStock - inCart;
     if (remaining <= 0) return { label: 'Out of Stock', color: 'text-red-400' };
     if (remaining <= 5) return { label: `Low Stock (${remaining} left)`, color: 'text-orange-400' };
     return { label: 'In Stock', color: 'text-green-400' };
@@ -317,7 +318,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentIma
     const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
     if (currentQty >= MAX_QTY_PER_SIZE) return false;
     if (totalItems >= MAX_CART_ITEMS) return false;
-    if (currentQty >= (STOCK[selectedSize] || 0)) return false;
+    if (currentQty >= (stock[selectedSize] || 0)) return false;
     return true;
   };
 
@@ -328,7 +329,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentIma
       const currentQty = existing?.quantity || 0;
       if (currentQty >= MAX_QTY_PER_SIZE) {
         setCartError(`Maximum ${MAX_QTY_PER_SIZE} per size allowed`);
-      } else if (currentQty >= (STOCK[selectedSize] || 0)) {
+      } else if (currentQty >= (stock[selectedSize] || 0)) {
         setCartError('This size is out of stock');
       } else {
         setCartError(`Maximum ${MAX_CART_ITEMS} items per order`);
@@ -565,9 +566,10 @@ interface CheckoutModalProps {
   onUpdateCart: (size: string, quantity: number) => void;
   onRemoveFromCart: (size: string) => void;
   currentImage: number;
+  stock: Record<string, number>;
 }
 
-const CheckoutModal = ({ product, cart, cartTotal, onClose, onUpdateCart, onRemoveFromCart, currentImage }: CheckoutModalProps) => {
+const CheckoutModal = ({ product, cart, cartTotal, onClose, onUpdateCart, onRemoveFromCart, currentImage, stock }: CheckoutModalProps) => {
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [formData, setFormData] = useState({ email: "", name: "" });
@@ -636,6 +638,7 @@ const CheckoutModal = ({ product, cart, cartTotal, onClose, onUpdateCart, onRemo
           amount: cartTotal,
           item_name: itemDescription,
           payment_id: orderNumber.current,
+          items: cart.map(item => ({ size: item.size, quantity: item.quantity })),
         }),
       });
 
@@ -858,7 +861,7 @@ const CheckoutModal = ({ product, cart, cartTotal, onClose, onUpdateCart, onRemo
                         <span className="text-white font-medium text-sm w-6 text-center">{item.quantity}</span>
                         <button
                           onClick={() => onUpdateCart(item.size, item.quantity + 1)}
-                          disabled={item.quantity >= MAX_QTY_PER_SIZE || item.quantity >= (STOCK[item.size] || 0)}
+                          disabled={item.quantity >= MAX_QTY_PER_SIZE || item.quantity >= (stock[item.size] || 0)}
                           className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           aria-label="Increase quantity"
                         >
@@ -1046,6 +1049,23 @@ const Newsletter = () => {
       {status === 'error' && (
         <p className="text-red-400 text-sm mt-2">Something went wrong. Try again.</p>
       )}
+
+      <a
+        href="https://whatsapp.com/channel/0029Vb6wcCeLCoWwT54KMn01"
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(
+          "mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors",
+          s
+            ? "bg-gray-700 text-white hover:bg-gray-600"
+            : "bg-green-600 text-white hover:bg-green-700"
+        )}
+      >
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+        </svg>
+        Join WhatsApp Channel
+      </a>
     </div>
   );
 };
@@ -1252,6 +1272,15 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>('color');
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [stock, setStock] = useState<Record<string, number>>(DEFAULT_STOCK);
+
+  // Fetch live stock levels from backend
+  useEffect(() => {
+    fetch('/api/stock')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setStock(data); })
+      .catch(() => {});
+  }, []);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
@@ -1284,7 +1313,7 @@ export default function App() {
       const existing = prev.find(item => item.size === selectedSize);
       if (existing) {
         if (existing.quantity >= MAX_QTY_PER_SIZE) return prev;
-        if (existing.quantity >= (STOCK[selectedSize] || 0)) return prev;
+        if (existing.quantity >= (stock[selectedSize] || 0)) return prev;
         return prev.map(item =>
           item.size === selectedSize
             ? { ...item, quantity: item.quantity + 1 }
@@ -1304,7 +1333,7 @@ export default function App() {
       return;
     }
     if (quantity > MAX_QTY_PER_SIZE) return;
-    if (quantity > (STOCK[size] || 0)) return;
+    if (quantity > (stock[size] || 0)) return;
     setCart(prev => prev.map(item =>
       item.size === size ? { ...item, quantity } : item
     ));
@@ -1337,6 +1366,7 @@ export default function App() {
           currentImage={currentImage}
           setCurrentImage={setCurrentImage}
           cart={cart}
+          stock={stock}
         />
         <Footer onOpenPrivacy={() => setShowPrivacy(true)} onOpenTerms={() => setShowTerms(true)} />
 
@@ -1353,6 +1383,7 @@ export default function App() {
               onUpdateCart={handleUpdateCart}
               onRemoveFromCart={handleRemoveFromCart}
               currentImage={currentImage}
+              stock={stock}
             />
           )}
         </AnimatePresence>
