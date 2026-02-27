@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback, createContext, useContext } from 'react';
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
-import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, Shield, Send, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, Shield, Send, Volume2, VolumeX, Minus, Plus, Trash2 } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
+import { formatZAR } from './utils/currency';
+import { PrivacyPolicyModal, TermsOfServiceModal } from './LegalPages';
 
 // Theme system
 type Theme = 'color' | 'stealth';
@@ -12,6 +14,14 @@ const ThemeContext = createContext<{ theme: Theme; toggleTheme: () => void }>({
   toggleTheme: () => {},
 });
 const useTheme = () => useContext(ThemeContext);
+
+// Cart types
+type CartItem = { size: string; quantity: number };
+const MAX_QTY_PER_SIZE = 3;
+const MAX_CART_ITEMS = 9;
+
+// Stock per size (update manually or connect to backend later)
+const STOCK: Record<string, number> = { S: 10, M: 15, L: 10 };
 
 const PRODUCT = {
   name: "BS X-Ray Motor-Cross Jersey",
@@ -28,7 +38,108 @@ const PRODUCT = {
   sizes: ["S", "M", "L"],
 };
 
-// --- Fix #1: Video play/pause now calls .play()/.pause() on the element ---
+// PayFast configuration (sandbox credentials for development)
+// In production, the /api/checkout route uses server-side env vars
+const PAYFAST_SANDBOX_CONFIG = {
+  merchant_id: '10000100',
+  merchant_key: '46f0cd694581a',
+  passphrase: '',
+  action_url: 'https://sandbox.payfast.co.za/eng/process',
+  return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
+  cancel_url: `${window.location.origin}${window.location.pathname}?payment=cancelled`,
+  notify_url: '',
+};
+
+// MD5 signature generation (used for sandbox/fallback only)
+const generatePayFastSignature = (data: Record<string, string>, passphrase?: string): string => {
+  const params = Object.entries(data)
+    .filter(([, value]) => value !== '')
+    .map(([key, value]) => `${key}=${encodeURIComponent(value.trim()).replace(/%20/g, '+')}`)
+    .join('&');
+  const signatureString = passphrase ? `${params}&passphrase=${encodeURIComponent(passphrase.trim()).replace(/%20/g, '+')}` : params;
+  return md5(signatureString);
+};
+
+function md5(string: string): string {
+  function md5cycle(x: number[], k: number[]) {
+    let a = x[0], b = x[1], c = x[2], d = x[3];
+    a = ff(a, b, c, d, k[0], 7, -680876936); d = ff(d, a, b, c, k[1], 12, -389564586);
+    c = ff(c, d, a, b, k[2], 17, 606105819); b = ff(b, c, d, a, k[3], 22, -1044525330);
+    a = ff(a, b, c, d, k[4], 7, -176418897); d = ff(d, a, b, c, k[5], 12, 1200080426);
+    c = ff(c, d, a, b, k[6], 17, -1473231341); b = ff(b, c, d, a, k[7], 22, -45705983);
+    a = ff(a, b, c, d, k[8], 7, 1770035416); d = ff(d, a, b, c, k[9], 12, -1958414417);
+    c = ff(c, d, a, b, k[10], 17, -42063); b = ff(b, c, d, a, k[11], 22, -1990404162);
+    a = ff(a, b, c, d, k[12], 7, 1804603682); d = ff(d, a, b, c, k[13], 12, -40341101);
+    c = ff(c, d, a, b, k[14], 17, -1502002290); b = ff(b, c, d, a, k[15], 22, 1236535329);
+    a = gg(a, b, c, d, k[1], 5, -165796510); d = gg(d, a, b, c, k[6], 9, -1069501632);
+    c = gg(c, d, a, b, k[11], 14, 643717713); b = gg(b, c, d, a, k[0], 20, -373897302);
+    a = gg(a, b, c, d, k[5], 5, -701558691); d = gg(d, a, b, c, k[10], 9, 38016083);
+    c = gg(c, d, a, b, k[15], 14, -660478335); b = gg(b, c, d, a, k[4], 20, -405537848);
+    a = gg(a, b, c, d, k[9], 5, 568446438); d = gg(d, a, b, c, k[14], 9, -1019803690);
+    c = gg(c, d, a, b, k[3], 14, -187363961); b = gg(b, c, d, a, k[8], 20, 1163531501);
+    a = gg(a, b, c, d, k[13], 5, -1444681467); d = gg(d, a, b, c, k[2], 9, -51403784);
+    c = gg(c, d, a, b, k[7], 14, 1735328473); b = gg(b, c, d, a, k[12], 20, -1926607734);
+    a = hh(a, b, c, d, k[5], 4, -378558); d = hh(d, a, b, c, k[8], 11, -2022574463);
+    c = hh(c, d, a, b, k[11], 16, 1839030562); b = hh(b, c, d, a, k[14], 23, -35309556);
+    a = hh(a, b, c, d, k[1], 4, -1530992060); d = hh(d, a, b, c, k[4], 11, 1272893353);
+    c = hh(c, d, a, b, k[7], 16, -155497632); b = hh(b, c, d, a, k[10], 23, -1094730640);
+    a = hh(a, b, c, d, k[13], 4, 681279174); d = hh(d, a, b, c, k[0], 11, -358537222);
+    c = hh(c, d, a, b, k[3], 16, -722521979); b = hh(b, c, d, a, k[6], 23, 76029189);
+    a = hh(a, b, c, d, k[9], 4, -640364487); d = hh(d, a, b, c, k[12], 11, -421815835);
+    c = hh(c, d, a, b, k[15], 16, 530742520); b = hh(b, c, d, a, k[2], 23, -995338651);
+    a = ii(a, b, c, d, k[0], 6, -198630844); d = ii(d, a, b, c, k[7], 10, 1126891415);
+    c = ii(c, d, a, b, k[14], 15, -1416354905); b = ii(b, c, d, a, k[5], 21, -57434055);
+    a = ii(a, b, c, d, k[12], 6, 1700485571); d = ii(d, a, b, c, k[3], 10, -1894986606);
+    c = ii(c, d, a, b, k[10], 15, -1051523); b = ii(b, c, d, a, k[1], 21, -2054922799);
+    a = ii(a, b, c, d, k[8], 6, 1873313359); d = ii(d, a, b, c, k[15], 10, -30611744);
+    c = ii(c, d, a, b, k[6], 15, -1560198380); b = ii(b, c, d, a, k[13], 21, 1309151649);
+    a = ii(a, b, c, d, k[4], 6, -145523070); d = ii(d, a, b, c, k[11], 10, -1120210379);
+    c = ii(c, d, a, b, k[2], 15, 718787259); b = ii(b, c, d, a, k[9], 21, -343485551);
+    x[0] = add32(a, x[0]); x[1] = add32(b, x[1]); x[2] = add32(c, x[2]); x[3] = add32(d, x[3]);
+  }
+  function cmn(q: number, a: number, b: number, x: number, s: number, t: number) {
+    a = add32(add32(a, q), add32(x, t));
+    return add32((a << s) | (a >>> (32 - s)), b);
+  }
+  function ff(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn((b & c) | ((~b) & d), a, b, x, s, t); }
+  function gg(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn((b & d) | (c & (~d)), a, b, x, s, t); }
+  function hh(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn(b ^ c ^ d, a, b, x, s, t); }
+  function ii(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn(c ^ (b | (~d)), a, b, x, s, t); }
+  function md51(s: string) {
+    const n = s.length;
+    let state = [1732584193, -271733879, -1732584194, 271733878];
+    let i: number;
+    for (i = 64; i <= n; i += 64) {
+      md5cycle(state, md5blk(s.substring(i - 64, i)));
+    }
+    s = s.substring(i - 64);
+    const tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (i = 0; i < s.length; i++) tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3);
+    tail[i >> 2] |= 0x80 << ((i % 4) << 3);
+    if (i > 55) { md5cycle(state, tail); for (i = 0; i < 16; i++) tail[i] = 0; }
+    tail[14] = n * 8;
+    md5cycle(state, tail);
+    return state;
+  }
+  function md5blk(s: string) {
+    const md5blks: number[] = [];
+    for (let i = 0; i < 64; i += 4) {
+      md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
+    }
+    return md5blks;
+  }
+  const hex_chr = '0123456789abcdef'.split('');
+  function rhex(n: number) {
+    let s = '';
+    for (let j = 0; j < 4; j++) s += hex_chr[(n >> (j * 8 + 4)) & 0x0f] + hex_chr[(n >> (j * 8)) & 0x0f];
+    return s;
+  }
+  function add32(a: number, b: number) { return (a + b) & 0xFFFFFFFF; }
+  function hex(x: number[]) { return x.map(v => rhex(v)).join(''); }
+  return hex(md51(string));
+}
+
+// --- Video Section ---
 const VideoSection = () => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -61,7 +172,6 @@ const VideoSection = () => {
         style={{ scale, opacity }}
         className="absolute inset-0"
       >
-        {/* Fix #9d: Added aria-label for video accessibility */}
         <video
           ref={videoRef}
           autoPlay
@@ -161,18 +271,19 @@ const VideoSection = () => {
   );
 };
 
-// --- Fix #3: ProductSection now receives lifted state via props ---
-// --- Fix #8: setTimeout is cleaned up on unmount via ref ---
+// --- Product Section ---
 interface ProductSectionProps {
   selectedSize: string | null;
   setSelectedSize: (size: string | null) => void;
   onAddToCart: () => void;
   currentImage: number;
   setCurrentImage: (idx: number) => void;
+  cart: CartItem[];
 }
 
-const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentImage, setCurrentImage }: ProductSectionProps) => {
+const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentImage, setCurrentImage, cart }: ProductSectionProps) => {
   const [isAdded, setIsAdded] = useState(false);
+  const [cartError, setCartError] = useState<string | null>(null);
   const addToCartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { theme } = useTheme();
   const s = theme === 'stealth';
@@ -189,6 +300,48 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentIma
       }
     };
   }, []);
+
+  const getStockStatus = (size: string) => {
+    const stock = STOCK[size] || 0;
+    const inCart = cart.find(item => item.size === size)?.quantity || 0;
+    const remaining = stock - inCart;
+    if (remaining <= 0) return { label: 'Out of Stock', color: 'text-red-400' };
+    if (remaining <= 5) return { label: `Low Stock (${remaining} left)`, color: 'text-orange-400' };
+    return { label: 'In Stock', color: 'text-green-400' };
+  };
+
+  const canAddToCart = () => {
+    if (!selectedSize) return false;
+    const existing = cart.find(item => item.size === selectedSize);
+    const currentQty = existing?.quantity || 0;
+    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+    if (currentQty >= MAX_QTY_PER_SIZE) return false;
+    if (totalItems >= MAX_CART_ITEMS) return false;
+    if (currentQty >= (STOCK[selectedSize] || 0)) return false;
+    return true;
+  };
+
+  const handleAdd = () => {
+    if (!selectedSize) return;
+    if (!canAddToCart()) {
+      const existing = cart.find(item => item.size === selectedSize);
+      const currentQty = existing?.quantity || 0;
+      if (currentQty >= MAX_QTY_PER_SIZE) {
+        setCartError(`Maximum ${MAX_QTY_PER_SIZE} per size allowed`);
+      } else if (currentQty >= (STOCK[selectedSize] || 0)) {
+        setCartError('This size is out of stock');
+      } else {
+        setCartError(`Maximum ${MAX_CART_ITEMS} items per order`);
+      }
+      setTimeout(() => setCartError(null), 3000);
+      return;
+    }
+    setIsAdded(true);
+    addToCartTimeoutRef.current = setTimeout(() => {
+      onAddToCart();
+      setIsAdded(false);
+    }, 1000);
+  };
 
   return (
     <section
@@ -269,7 +422,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentIma
                   {PRODUCT.name}
                 </h2>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
-                  <span className="text-3xl sm:text-4xl font-bold text-white">R{PRODUCT.price}</span>
+                  <span className="text-3xl sm:text-4xl font-bold text-white">{formatZAR(PRODUCT.price)}</span>
                 </div>
               </motion.div>
             </div>
@@ -299,25 +452,33 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentIma
                   </div>
 
                   <div className="grid grid-cols-3 gap-3">
-                    {PRODUCT.sizes.map((size, idx) => (
-                      <motion.button
-                        key={size}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={inView ? { opacity: 1, scale: 1 } : {}}
-                        transition={{ delay: 0.5 + idx * 0.05 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setSelectedSize(size)}
-                        className={cn(
-                          "py-4 rounded-xl border-2 font-semibold text-lg transition-all duration-300",
-                          selectedSize === size
-                            ? (s ? "border-white bg-white/10 text-white scale-105" : "border-purple-500 bg-purple-500/20 text-white scale-105")
-                            : "border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600"
-                        )}
-                      >
-                        {size}
-                      </motion.button>
-                    ))}
+                    {PRODUCT.sizes.map((size, idx) => {
+                      const stockStatus = getStockStatus(size);
+                      const outOfStock = stockStatus.label === 'Out of Stock';
+                      return (
+                        <motion.button
+                          key={size}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={inView ? { opacity: 1, scale: 1 } : {}}
+                          transition={{ delay: 0.5 + idx * 0.05 }}
+                          whileHover={outOfStock ? {} : { scale: 1.05 }}
+                          whileTap={outOfStock ? {} : { scale: 0.95 }}
+                          onClick={() => !outOfStock && setSelectedSize(size)}
+                          disabled={outOfStock}
+                          className={cn(
+                            "py-4 rounded-xl border-2 font-semibold text-lg transition-all duration-300",
+                            outOfStock
+                              ? "border-gray-800 bg-gray-800/30 text-gray-600 cursor-not-allowed"
+                              : selectedSize === size
+                                ? (s ? "border-white bg-white/10 text-white scale-105" : "border-purple-500 bg-purple-500/20 text-white scale-105")
+                                : "border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600"
+                          )}
+                        >
+                          <div>{size}</div>
+                          <div className={cn("text-xs mt-1 font-normal", stockStatus.color)}>{stockStatus.label}</div>
+                        </motion.button>
+                      );
+                    })}
                   </div>
                 </motion.div>
 
@@ -330,15 +491,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentIma
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      if (selectedSize) {
-                        setIsAdded(true);
-                        addToCartTimeoutRef.current = setTimeout(() => {
-                          onAddToCart();
-                          setIsAdded(false);
-                        }, 1000);
-                      }
-                    }}
+                    onClick={handleAdd}
                     disabled={!selectedSize}
                     className={cn(
                       "w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300",
@@ -357,10 +510,20 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentIma
                     ) : (
                       <>
                         <ShoppingBag className="w-6 h-6" />
-                        {selectedSize ? `Add to Cart - R${PRODUCT.price}` : "Select a Size"}
+                        {selectedSize ? `Add to Cart - ${formatZAR(PRODUCT.price)}` : "Select a Size"}
                       </>
                     )}
                   </motion.button>
+
+                  {cartError && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-orange-400 text-sm text-center"
+                    >
+                      {cartError}
+                    </motion.p>
+                  )}
 
                   <div className="flex items-center justify-center gap-6 text-gray-500 text-sm">
                     <div className="flex items-center gap-2">
@@ -382,143 +545,8 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart, currentIma
   );
 };
 
-// PayFast configuration
-// ──────────────────────────────────────────────────────────────────────
-// HOW TO SET UP PAYFAST:
-//
-// 1. Create a PayFast account at https://www.payfast.co.za
-// 2. Go to Settings → Integration to get your merchant_id and merchant_key
-// 3. For testing, use the sandbox credentials below (already set):
-//      merchant_id:  10000100
-//      merchant_key: 46f0cd694581a
-//      passphrase:   (leave empty for sandbox)
-// 4. Set action_url to sandbox for testing:
-//      https://sandbox.payfast.co.za/eng/process
-// 5. For PRODUCTION, update:
-//      merchant_id  → your real Merchant ID from PayFast dashboard
-//      merchant_key → your real Merchant Key
-//      passphrase   → your passphrase from Settings → Integration
-//      action_url   → https://www.payfast.co.za/eng/process
-// 6. notify_url (ITN): When you have a backend server, set this to
-//    your server endpoint (e.g. https://yourdomain.co.za/api/payfast/notify)
-//    PayFast sends POST requests here to confirm payment status.
-//    Without this, you rely on the return_url redirect only.
-//
-// FLOW: Customer fills in details → clicks Pay → redirected to PayFast →
-//       pays via card/EFT/SnapScan → redirected back to return_url or cancel_url
-// ──────────────────────────────────────────────────────────────────────
-const PAYFAST_CONFIG = {
-  merchant_id: '10000100',
-  merchant_key: '46f0cd694581a',
-  passphrase: '',  // Set your passphrase for production (Settings → Integration)
-  action_url: 'https://sandbox.payfast.co.za/eng/process',
-  return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
-  cancel_url: `${window.location.origin}${window.location.pathname}?payment=cancelled`,
-  notify_url: '',
-};
-
-// Generate PayFast MD5 signature (required for production)
-const generatePayFastSignature = (data: Record<string, string>, passphrase?: string): string => {
-  const params = Object.entries(data)
-    .filter(([, value]) => value !== '')
-    .map(([key, value]) => `${key}=${encodeURIComponent(value.trim()).replace(/%20/g, '+')}`)
-    .join('&');
-  const signatureString = passphrase ? `${params}&passphrase=${encodeURIComponent(passphrase.trim()).replace(/%20/g, '+')}` : params;
-  // MD5 hash — using SubtleCrypto would be async; for simplicity, we use a
-  // lightweight MD5 implementation inline. In production, consider a server-side
-  // signature generation for security.
-  return md5(signatureString);
-};
-
-// Lightweight MD5 implementation for PayFast signature
-function md5(string: string): string {
-  function md5cycle(x: number[], k: number[]) {
-    let a = x[0], b = x[1], c = x[2], d = x[3];
-    a = ff(a, b, c, d, k[0], 7, -680876936); d = ff(d, a, b, c, k[1], 12, -389564586);
-    c = ff(c, d, a, b, k[2], 17, 606105819); b = ff(b, c, d, a, k[3], 22, -1044525330);
-    a = ff(a, b, c, d, k[4], 7, -176418897); d = ff(d, a, b, c, k[5], 12, 1200080426);
-    c = ff(c, d, a, b, k[6], 17, -1473231341); b = ff(b, c, d, a, k[7], 22, -45705983);
-    a = ff(a, b, c, d, k[8], 7, 1770035416); d = ff(d, a, b, c, k[9], 12, -1958414417);
-    c = ff(c, d, a, b, k[10], 17, -42063); b = ff(b, c, d, a, k[11], 22, -1990404162);
-    a = ff(a, b, c, d, k[12], 7, 1804603682); d = ff(d, a, b, c, k[13], 12, -40341101);
-    c = ff(c, d, a, b, k[14], 17, -1502002290); b = ff(b, c, d, a, k[15], 22, 1236535329);
-    a = gg(a, b, c, d, k[1], 5, -165796510); d = gg(d, a, b, c, k[6], 9, -1069501632);
-    c = gg(c, d, a, b, k[11], 14, 643717713); b = gg(b, c, d, a, k[0], 20, -373897302);
-    a = gg(a, b, c, d, k[5], 5, -701558691); d = gg(d, a, b, c, k[10], 9, 38016083);
-    c = gg(c, d, a, b, k[15], 14, -660478335); b = gg(b, c, d, a, k[4], 20, -405537848);
-    a = gg(a, b, c, d, k[9], 5, 568446438); d = gg(d, a, b, c, k[14], 9, -1019803690);
-    c = gg(c, d, a, b, k[3], 14, -187363961); b = gg(b, c, d, a, k[8], 20, 1163531501);
-    a = gg(a, b, c, d, k[13], 5, -1444681467); d = gg(d, a, b, c, k[2], 9, -51403784);
-    c = gg(c, d, a, b, k[7], 14, 1735328473); b = gg(b, c, d, a, k[12], 20, -1926607734);
-    a = hh(a, b, c, d, k[5], 4, -378558); d = hh(d, a, b, c, k[8], 11, -2022574463);
-    c = hh(c, d, a, b, k[11], 16, 1839030562); b = hh(b, c, d, a, k[14], 23, -35309556);
-    a = hh(a, b, c, d, k[1], 4, -1530992060); d = hh(d, a, b, c, k[4], 11, 1272893353);
-    c = hh(c, d, a, b, k[7], 16, -155497632); b = hh(b, c, d, a, k[10], 23, -1094730640);
-    a = hh(a, b, c, d, k[13], 4, 681279174); d = hh(d, a, b, c, k[0], 11, -358537222);
-    c = hh(c, d, a, b, k[3], 16, -722521979); b = hh(b, c, d, a, k[6], 23, 76029189);
-    a = hh(a, b, c, d, k[9], 4, -640364487); d = hh(d, a, b, c, k[12], 11, -421815835);
-    c = hh(c, d, a, b, k[15], 16, 530742520); b = hh(b, c, d, a, k[2], 23, -995338651);
-    a = ii(a, b, c, d, k[0], 6, -198630844); d = ii(d, a, b, c, k[7], 10, 1126891415);
-    c = ii(c, d, a, b, k[14], 15, -1416354905); b = ii(b, c, d, a, k[5], 21, -57434055);
-    a = ii(a, b, c, d, k[12], 6, 1700485571); d = ii(d, a, b, c, k[3], 10, -1894986606);
-    c = ii(c, d, a, b, k[10], 15, -1051523); b = ii(b, c, d, a, k[1], 21, -2054922799);
-    a = ii(a, b, c, d, k[8], 6, 1873313359); d = ii(d, a, b, c, k[15], 10, -30611744);
-    c = ii(c, d, a, b, k[6], 15, -1560198380); b = ii(b, c, d, a, k[13], 21, 1309151649);
-    a = ii(a, b, c, d, k[4], 6, -145523070); d = ii(d, a, b, c, k[11], 10, -1120210379);
-    c = ii(c, d, a, b, k[2], 15, 718787259); b = ii(b, c, d, a, k[9], 21, -343485551);
-    x[0] = add32(a, x[0]); x[1] = add32(b, x[1]); x[2] = add32(c, x[2]); x[3] = add32(d, x[3]);
-  }
-  function cmn(q: number, a: number, b: number, x: number, s: number, t: number) {
-    a = add32(add32(a, q), add32(x, t));
-    return add32((a << s) | (a >>> (32 - s)), b);
-  }
-  function ff(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn((b & c) | ((~b) & d), a, b, x, s, t); }
-  function gg(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn((b & d) | (c & (~d)), a, b, x, s, t); }
-  function hh(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn(b ^ c ^ d, a, b, x, s, t); }
-  function ii(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn(c ^ (b | (~d)), a, b, x, s, t); }
-  function md51(s: string) {
-    const n = s.length;
-    let state = [1732584193, -271733879, -1732584194, 271733878];
-    let i: number;
-    for (i = 64; i <= n; i += 64) {
-      md5cycle(state, md5blk(s.substring(i - 64, i)));
-    }
-    s = s.substring(i - 64);
-    const tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    for (i = 0; i < s.length; i++) tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3);
-    tail[i >> 2] |= 0x80 << ((i % 4) << 3);
-    if (i > 55) { md5cycle(state, tail); for (i = 0; i < 16; i++) tail[i] = 0; }
-    tail[14] = n * 8;
-    md5cycle(state, tail);
-    return state;
-  }
-  function md5blk(s: string) {
-    const md5blks: number[] = [];
-    for (let i = 0; i < 64; i += 4) {
-      md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
-    }
-    return md5blks;
-  }
-  const hex_chr = '0123456789abcdef'.split('');
-  function rhex(n: number) {
-    let s = '';
-    for (let j = 0; j < 4; j++) s += hex_chr[(n >> (j * 8 + 4)) & 0x0f] + hex_chr[(n >> (j * 8)) & 0x0f];
-    return s;
-  }
-  function add32(a: number, b: number) { return (a + b) & 0xFFFFFFFF; }
-  function hex(x: number[]) { return x.map(v => rhex(v)).join(''); }
-  return hex(md51(string));
-}
-
-// --- Fix #5: Order number generated once via useRef ---
-// --- Fix #6: size prop guarded with default ---
-// --- Fix #9c: Focus trapping in modal ---
-// Map catalog selection to the image shown in checkout step 2
+// Map catalog selection to the image shown in checkout
 const getCheckoutImage = (currentImage: number): string => {
-  // boy.jpeg (index 1) → pinkracer.jpeg
-  // pinkracer.jpeg (index 2) → pinkracer.jpeg
-  // girl.jpeg (index 3) → greenracer.jpeg
-  // greenracer.jpeg (index 4) → greenracer.jpeg
   const checkoutImageMap: Record<number, string> = {
     1: '/media/pinkracer.jpeg',
     2: '/media/pinkracer.jpeg',
@@ -528,16 +556,27 @@ const getCheckoutImage = (currentImage: number): string => {
   return checkoutImageMap[currentImage] || PRODUCT.images[currentImage];
 };
 
-const CheckoutModal = ({ product, size, onClose, currentImage }: { product: typeof PRODUCT; size: string; onClose: () => void; currentImage: number }) => {
+// --- Checkout Modal ---
+interface CheckoutModalProps {
+  product: typeof PRODUCT;
+  cart: CartItem[];
+  cartTotal: number;
+  onClose: () => void;
+  onUpdateCart: (size: string, quantity: number) => void;
+  onRemoveFromCart: (size: string) => void;
+  currentImage: number;
+}
+
+const CheckoutModal = ({ product, cart, cartTotal, onClose, onUpdateCart, onRemoveFromCart, currentImage }: CheckoutModalProps) => {
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    name: "",
-  });
-  const [signature, setSignature] = useState('');
+  const [formData, setFormData] = useState({ email: "", name: "" });
+  const [consent, setConsent] = useState({ terms: false, marketing: false });
+  const [payfastFormData, setPayfastFormData] = useState<Record<string, string> | null>(null);
+  const [payfastActionUrl, setPayfastActionUrl] = useState('');
   const orderNumber = useRef(`BS-${Math.random().toString(36).substr(2, 8).toUpperCase()}`);
   const modalRef = useRef<HTMLDivElement>(null);
+  const payfastFormRef = useRef<HTMLFormElement>(null);
   const { theme } = useTheme();
   const s = theme === 'stealth';
 
@@ -579,34 +618,57 @@ const CheckoutModal = ({ product, size, onClose, currentImage }: { product: type
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [step, stableOnClose]);
 
-  const payfastFormRef = useRef<HTMLFormElement>(null);
-
-  const handlePayFastSubmit = () => {
+  const handlePayFastSubmit = async () => {
     setIsProcessing(true);
 
-    // Build the PayFast parameter object in the exact order PayFast expects
+    const itemDescription = cart
+      .map(item => `${product.name} (${item.size}) x${item.quantity}`)
+      .join(', ');
+
+    // Try server-side API route first (production), fall back to client-side (sandbox)
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          name: formData.name,
+          amount: cartTotal,
+          item_name: itemDescription,
+          payment_id: orderNumber.current,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const { action_url, ...formFields } = data;
+        setPayfastActionUrl(action_url as string);
+        setPayfastFormData(formFields as Record<string, string>);
+        requestAnimationFrame(() => payfastFormRef.current?.submit());
+        return;
+      }
+    } catch {
+      // API not available — fall back to client-side sandbox
+    }
+
+    // Fallback: client-side signature generation (sandbox mode)
     const pfData: Record<string, string> = {
-      merchant_id: PAYFAST_CONFIG.merchant_id,
-      merchant_key: PAYFAST_CONFIG.merchant_key,
-      return_url: PAYFAST_CONFIG.return_url,
-      cancel_url: PAYFAST_CONFIG.cancel_url,
-      ...(PAYFAST_CONFIG.notify_url ? { notify_url: PAYFAST_CONFIG.notify_url } : {}),
+      merchant_id: PAYFAST_SANDBOX_CONFIG.merchant_id,
+      merchant_key: PAYFAST_SANDBOX_CONFIG.merchant_key,
+      return_url: PAYFAST_SANDBOX_CONFIG.return_url,
+      cancel_url: PAYFAST_SANDBOX_CONFIG.cancel_url,
       name_first: formData.name.split(' ')[0] || '',
       name_last: formData.name.split(' ').slice(1).join(' ') || '',
       email_address: formData.email,
       m_payment_id: orderNumber.current,
-      amount: product.price.toFixed(2),
-      item_name: `${product.name} - Size ${size}`,
+      amount: cartTotal.toFixed(2),
+      item_name: itemDescription,
     };
 
-    // Generate and set the signature, then submit on next render
-    const sig = generatePayFastSignature(pfData, PAYFAST_CONFIG.passphrase || undefined);
-    setSignature(sig);
-
-    // Use requestAnimationFrame to ensure the signature input is rendered before submit
-    requestAnimationFrame(() => {
-      payfastFormRef.current?.submit();
-    });
+    const sig = generatePayFastSignature(pfData, PAYFAST_SANDBOX_CONFIG.passphrase || undefined);
+    setPayfastActionUrl(PAYFAST_SANDBOX_CONFIG.action_url);
+    setPayfastFormData({ ...pfData, signature: sig });
+    requestAnimationFrame(() => payfastFormRef.current?.submit());
   };
 
   return (
@@ -682,11 +744,12 @@ const CheckoutModal = ({ product, size, onClose, currentImage }: { product: type
         </div>
 
         <div className="p-5 sm:p-8">
+          {/* Step 1: Contact Info + POPIA Consent */}
           {step === 1 && (
             <motion.form
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              onSubmit={(e) => { e.preventDefault(); setStep(2); }}
+              onSubmit={(e) => { e.preventDefault(); if (consent.terms) setStep(2); }}
               className="space-y-4"
             >
               <div>
@@ -711,9 +774,52 @@ const CheckoutModal = ({ product, size, onClose, currentImage }: { product: type
                   placeholder="John Doe"
                 />
               </div>
+
+              {/* POPIA-compliant consent checkboxes */}
+              <div className="space-y-3 pt-2">
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={consent.terms}
+                    onChange={(e) => setConsent({ ...consent, terms: e.target.checked })}
+                    className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 accent-purple-500"
+                    required
+                  />
+                  <span className="text-sm text-gray-400 group-hover:text-gray-300">
+                    I agree to the{' '}
+                    <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('open-terms'))} className={cn("underline", s ? "text-gray-300" : "text-purple-400")}>
+                      Terms of Service
+                    </button>{' '}
+                    and{' '}
+                    <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('open-privacy'))} className={cn("underline", s ? "text-gray-300" : "text-purple-400")}>
+                      Privacy Policy
+                    </button>
+                    . I consent to the processing of my personal information as described. <span className="text-red-400">*</span>
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={consent.marketing}
+                    onChange={(e) => setConsent({ ...consent, marketing: e.target.checked })}
+                    className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 accent-purple-500"
+                  />
+                  <span className="text-sm text-gray-400 group-hover:text-gray-300">
+                    I would like to receive marketing emails about new products and exclusive offers. (Optional)
+                  </span>
+                </label>
+              </div>
+
               <button
                 type="submit"
-                className={cn("w-full py-4 text-white font-bold rounded-xl hover:shadow-lg transition-all", s ? "bg-white !text-black hover:bg-gray-100 hover:shadow-white/10" : "bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-purple-500/25")}
+                disabled={!consent.terms}
+                className={cn(
+                  "w-full py-4 font-bold rounded-xl transition-all",
+                  consent.terms
+                    ? (s ? "bg-white !text-black hover:bg-gray-100 hover:shadow-lg hover:shadow-white/10" : "bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-lg hover:shadow-purple-500/25")
+                    : "bg-gray-700 text-gray-500 cursor-not-allowed"
+                )}
               >
                 Continue to Payment
                 <ArrowRight className="w-5 h-5 inline-block ml-2" />
@@ -721,27 +827,61 @@ const CheckoutModal = ({ product, size, onClose, currentImage }: { product: type
             </motion.form>
           )}
 
+          {/* Step 2: Order Summary + Payment */}
           {step === 2 && (
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               className="space-y-4"
             >
-              <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700 mb-6">
-                <div className="flex gap-4">
-                  <img src={getCheckoutImage(currentImage)} alt={product.name} className="w-20 h-20 rounded-lg object-cover" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-white">{product.name}</h3>
-                    <p className="text-gray-400 text-sm">Size: {size}</p>
-                    <p className={cn("font-bold mt-1", s ? "text-gray-300" : "text-purple-400")}>R{product.price}</p>
+              {/* Cart items */}
+              <div className="space-y-3 mb-6">
+                {cart.map((item) => (
+                  <div key={item.size} className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                    <div className="flex gap-4">
+                      <img src={getCheckoutImage(currentImage)} alt={product.name} className="w-16 h-16 rounded-lg object-cover" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-white text-sm">{product.name}</h3>
+                        <p className="text-gray-400 text-xs">Size: {item.size}</p>
+                        <p className={cn("font-bold text-sm mt-1", s ? "text-gray-300" : "text-purple-400")}>
+                          {formatZAR(product.price * item.quantity)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => onUpdateCart(item.size, item.quantity - 1)}
+                          className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 transition-colors"
+                          aria-label="Decrease quantity"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-white font-medium text-sm w-6 text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => onUpdateCart(item.size, item.quantity + 1)}
+                          disabled={item.quantity >= MAX_QTY_PER_SIZE || item.quantity >= (STOCK[item.size] || 0)}
+                          className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Increase quantity"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => onRemoveFromCart(item.size)}
+                          className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-gray-600 transition-colors ml-1"
+                          aria-label="Remove item"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
 
+              {/* Order total */}
               <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700 space-y-2">
                 <div className="flex justify-between text-gray-400">
-                  <span>Subtotal</span>
-                  <span>R{product.price}</span>
+                  <span>Subtotal ({cart.reduce((sum, i) => sum + i.quantity, 0)} item{cart.reduce((sum, i) => sum + i.quantity, 0) !== 1 ? 's' : ''})</span>
+                  <span>{formatZAR(cartTotal)}</span>
                 </div>
                 <div className="flex justify-between text-gray-400">
                   <span>Shipping</span>
@@ -749,7 +889,7 @@ const CheckoutModal = ({ product, size, onClose, currentImage }: { product: type
                 </div>
                 <div className="border-t border-gray-700 pt-2 flex justify-between text-white font-bold">
                   <span>Total</span>
-                  <span>R{product.price}</span>
+                  <span>{formatZAR(cartTotal)}</span>
                 </div>
               </div>
 
@@ -759,33 +899,22 @@ const CheckoutModal = ({ product, size, onClose, currentImage }: { product: type
                 </p>
               </div>
 
-              {/* Hidden PayFast form — submits directly to PayFast's hosted payment page */}
+              {/* Hidden PayFast form */}
               <form
                 ref={payfastFormRef}
-                action={PAYFAST_CONFIG.action_url}
+                action={payfastActionUrl || PAYFAST_SANDBOX_CONFIG.action_url}
                 method="POST"
                 className="hidden"
               >
-                <input type="hidden" name="merchant_id" value={PAYFAST_CONFIG.merchant_id} />
-                <input type="hidden" name="merchant_key" value={PAYFAST_CONFIG.merchant_key} />
-                <input type="hidden" name="return_url" value={PAYFAST_CONFIG.return_url} />
-                <input type="hidden" name="cancel_url" value={PAYFAST_CONFIG.cancel_url} />
-                {PAYFAST_CONFIG.notify_url && (
-                  <input type="hidden" name="notify_url" value={PAYFAST_CONFIG.notify_url} />
-                )}
-                <input type="hidden" name="name_first" value={formData.name.split(' ')[0] || ''} />
-                <input type="hidden" name="name_last" value={formData.name.split(' ').slice(1).join(' ') || ''} />
-                <input type="hidden" name="email_address" value={formData.email} />
-                <input type="hidden" name="m_payment_id" value={orderNumber.current} />
-                <input type="hidden" name="amount" value={product.price.toFixed(2)} />
-                <input type="hidden" name="item_name" value={`${product.name} - Size ${size}`} />
-                {signature && <input type="hidden" name="signature" value={signature} />}
+                {payfastFormData && Object.entries(payfastFormData).map(([key, value]) => (
+                  <input type="hidden" name={key} value={value} key={key} />
+                ))}
               </form>
 
               <button
                 type="button"
                 onClick={handlePayFastSubmit}
-                disabled={isProcessing}
+                disabled={isProcessing || cart.length === 0}
                 className={cn("w-full py-4 font-bold rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed", s ? "bg-white text-black hover:bg-gray-100 hover:shadow-white/10" : "bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-purple-500/25")}
               >
                 {isProcessing ? (
@@ -796,7 +925,7 @@ const CheckoutModal = ({ product, size, onClose, currentImage }: { product: type
                 ) : (
                   <>
                     <Shield className="w-5 h-5 inline-block mr-2" />
-                    Pay R{product.price} with PayFast
+                    Pay {formatZAR(cartTotal)} with PayFast
                   </>
                 )}
               </button>
@@ -806,11 +935,12 @@ const CheckoutModal = ({ product, size, onClose, currentImage }: { product: type
                 onClick={() => setStep(1)}
                 className="w-full py-2 text-gray-400 hover:text-white transition-colors"
               >
-                ← Back
+                &larr; Back
               </button>
             </motion.div>
           )}
 
+          {/* Step 3: Confirmation */}
           {step === 3 && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -828,7 +958,6 @@ const CheckoutModal = ({ product, size, onClose, currentImage }: { product: type
 
               <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
                 <p className="text-sm text-gray-400">Order Number</p>
-                {/* Fix #5: Order number stable across re-renders */}
                 <p className={cn("text-lg font-mono", s ? "text-white" : "text-purple-400")}>{orderNumber.current}</p>
               </div>
 
@@ -851,6 +980,7 @@ const CheckoutModal = ({ product, size, onClose, currentImage }: { product: type
   );
 };
 
+// --- Newsletter ---
 const Newsletter = () => {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
@@ -871,7 +1001,7 @@ const Newsletter = () => {
           to_email: 'babysitterbs9@gmail.com',
           message: `New newsletter subscriber: ${email}`,
         },
-        'YOUR_EMAILJS_PUBLIC_KEY'
+        import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'YOUR_EMAILJS_PUBLIC_KEY'
       );
       setStatus('sent');
       setEmail('');
@@ -919,7 +1049,8 @@ const Newsletter = () => {
   );
 };
 
-const Footer = () => {
+// --- Footer ---
+const Footer = ({ onOpenPrivacy, onOpenTerms }: { onOpenPrivacy: () => void; onOpenTerms: () => void }) => {
   const { theme } = useTheme();
   const s = theme === 'stealth';
   const linkHover = s ? "hover:text-gray-200" : "hover:text-purple-400";
@@ -951,7 +1082,7 @@ const Footer = () => {
               <li><a href="#" className={cn(linkHover, "transition-colors")}>FAQ</a></li>
               <li><a href="#" className={cn(linkHover, "transition-colors")}>Shipping</a></li>
               <li><a href="#" className={cn(linkHover, "transition-colors")}>Returns</a></li>
-              <li><a href="#" className={cn(linkHover, "transition-colors")}>Contact</a></li>
+              <li><a href="mailto:babysitterbs9@gmail.com" className={cn(linkHover, "transition-colors")}>Contact</a></li>
             </ul>
           </div>
 
@@ -961,12 +1092,10 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* Fix #9a: Dynamic copyright year */}
           <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} BABYSITTER. All rights reserved.</p>
           <div className="flex items-center gap-4 text-gray-500 text-sm">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-white transition-colors">Cookies</a>
+            <button onClick={onOpenPrivacy} className="hover:text-white transition-colors">Privacy Policy</button>
+            <button onClick={onOpenTerms} className="hover:text-white transition-colors">Terms of Service</button>
           </div>
         </div>
       </div>
@@ -974,6 +1103,7 @@ const Footer = () => {
   );
 };
 
+// --- Theme Toggle ---
 const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();
   const isStealth = theme === 'stealth';
@@ -1015,6 +1145,7 @@ const ThemeToggle = () => {
   );
 };
 
+// --- Floating Cart ---
 const FloatingCart = ({ onClick, count }: { onClick: () => void; count: number }) => {
   const { theme } = useTheme();
   const s = theme === 'stealth';
@@ -1051,10 +1182,7 @@ const FloatingCart = ({ onClick, count }: { onClick: () => void; count: number }
   );
 };
 
-// --- Fix #3: Single source of truth for cart state, lifted to App ---
-// --- Fix #4: cartCount setter is now available and wired up ---
-// --- Fix #6: Modal only renders when selectedSize is truthy (no null assertion needed) ---
-// Detect PayFast return URL params
+// --- Payment Return Banner ---
 const PaymentReturnBanner = () => {
   const [status, setStatus] = useState<'success' | 'cancelled' | null>(null);
 
@@ -1064,7 +1192,6 @@ const PaymentReturnBanner = () => {
     if (payment === 'success') setStatus('success');
     else if (payment === 'cancelled') setStatus('cancelled');
 
-    // Clean up URL params after reading
     if (payment) {
       const url = new URL(window.location.href);
       url.searchParams.delete('payment');
@@ -1115,12 +1242,15 @@ const PaymentReturnBanner = () => {
   );
 };
 
+// --- App ---
 export default function App() {
   const [showCart, setShowCart] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [currentImage, setCurrentImage] = useState(0);
   const [theme, setTheme] = useState<Theme>('color');
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
@@ -1131,9 +1261,56 @@ export default function App() {
   const toggleTheme = () => setTheme(t => t === 'color' ? 'stealth' : 'color');
   const s = theme === 'stealth';
 
+  // Derived cart values
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + item.quantity * PRODUCT.price, 0);
+
+  // Listen for legal modal events from checkout
+  useEffect(() => {
+    const openPrivacy = () => setShowPrivacy(true);
+    const openTerms = () => setShowTerms(true);
+    window.addEventListener('open-privacy', openPrivacy);
+    window.addEventListener('open-terms', openTerms);
+    return () => {
+      window.removeEventListener('open-privacy', openPrivacy);
+      window.removeEventListener('open-terms', openTerms);
+    };
+  }, []);
+
   const handleAddToCart = () => {
-    setCartCount(prev => prev + 1);
+    if (!selectedSize) return;
+    setCart(prev => {
+      const existing = prev.find(item => item.size === selectedSize);
+      if (existing) {
+        if (existing.quantity >= MAX_QTY_PER_SIZE) return prev;
+        if (existing.quantity >= (STOCK[selectedSize] || 0)) return prev;
+        return prev.map(item =>
+          item.size === selectedSize
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      const totalItems = prev.reduce((sum, item) => sum + item.quantity, 0);
+      if (totalItems >= MAX_CART_ITEMS) return prev;
+      return [...prev, { size: selectedSize, quantity: 1 }];
+    });
     setShowCart(true);
+  };
+
+  const handleUpdateCart = (size: string, quantity: number) => {
+    if (quantity <= 0) {
+      setCart(prev => prev.filter(item => item.size !== size));
+      return;
+    }
+    if (quantity > MAX_QTY_PER_SIZE) return;
+    if (quantity > (STOCK[size] || 0)) return;
+    setCart(prev => prev.map(item =>
+      item.size === size ? { ...item, quantity } : item
+    ));
+  };
+
+  const handleRemoveFromCart = (size: string) => {
+    setCart(prev => prev.filter(item => item.size !== size));
   };
 
   return (
@@ -1158,22 +1335,29 @@ export default function App() {
           onAddToCart={handleAddToCart}
           currentImage={currentImage}
           setCurrentImage={setCurrentImage}
+          cart={cart}
         />
-        <Footer />
+        <Footer onOpenPrivacy={() => setShowPrivacy(true)} onOpenTerms={() => setShowTerms(true)} />
 
         <ThemeToggle />
         <FloatingCart onClick={() => setShowCart(true)} count={cartCount} />
 
         <AnimatePresence>
-          {showCart && selectedSize && (
+          {showCart && cart.length > 0 && (
             <CheckoutModal
               product={PRODUCT}
-              size={selectedSize}
+              cart={cart}
+              cartTotal={cartTotal}
               onClose={() => setShowCart(false)}
+              onUpdateCart={handleUpdateCart}
+              onRemoveFromCart={handleRemoveFromCart}
               currentImage={currentImage}
             />
           )}
         </AnimatePresence>
+
+        <PrivacyPolicyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+        <TermsOfServiceModal isOpen={showTerms} onClose={() => setShowTerms(false)} />
       </div>
     </ThemeContext.Provider>
   );
