@@ -994,14 +994,15 @@ const Newsletter = () => {
 
     try {
       await emailjs.send(
-        'service_babysitter',
-        'template_newsletter',
+        'service_9hur70a',
+        'template_z9lxoyg',
         {
-          subscriber_email: email,
-          to_email: 'babysitterbs9@gmail.com',
+          title: 'New Newsletter Subscriber',
+          name: 'Newsletter Signup',
           message: `New newsletter subscriber: ${email}`,
+          email: email,
         },
-        import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'YOUR_EMAILJS_PUBLIC_KEY'
+        'eCPPadAcoOTV9zYlk'
       );
       setStatus('sent');
       setEmail('');
