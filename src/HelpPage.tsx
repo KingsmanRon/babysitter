@@ -248,7 +248,7 @@ export default function HelpPage() {
             to="/"
             className="text-white font-extrabold text-lg tracking-[3px] uppercase hover:opacity-80 transition-opacity"
           >
-            BABYSITTER™
+            BABYSITTER
           </Link>
           <Link
             to="/"
@@ -520,7 +520,7 @@ export default function HelpPage() {
             CHANGING THE WORLD ONE GARMENT AT A TIME.
           </p>
           <p className="text-xs" style={{ color: colors.textMuted }}>
-            &copy; {new Date().getFullYear()} BABYSITTER™. All rights reserved.
+            &copy; {new Date().getFullYear()} BABYSITTER. All rights reserved.
           </p>
         </div>
       </div>
