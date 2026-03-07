@@ -1,23 +1,23 @@
 import { useState, useEffect, useId } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronDown, Truck, RotateCcw, CreditCard, Mail, ArrowLeft } from 'lucide-react';
+import { ChevronDown, Truck, RotateCcw, CreditCard, Mail, ArrowLeft, Play } from 'lucide-react';
 import { useInView } from 'react-intersection-observer';
 
-// --- Colors ---
+// --- Stealth Grey Colors ---
 const colors = {
-  bgDeep: '#0C1219',
-  bgPrimary: '#111A24',
-  card: '#162030',
-  cardHover: '#1B2840',
-  textPrimary: '#E8ECF1',
-  textSecondary: '#8A9BB5',
-  textMuted: '#556B85',
-  accent: '#4A9EAD',
-  accentBright: '#5DC4D6',
-  accentGlow: 'rgba(74, 158, 173, 0.15)',
-  border: 'rgba(255, 255, 255, 0.06)',
-  borderHover: 'rgba(255, 255, 255, 0.1)',
+  bgDeep: '#0a0a0a',
+  bgPrimary: '#111111',
+  card: '#1a1a1a',
+  cardHover: '#222222',
+  textPrimary: '#e5e5e5',
+  textSecondary: '#a3a3a3',
+  textMuted: '#737373',
+  accent: '#d4d4d4',
+  accentBright: '#ffffff',
+  accentGlow: 'rgba(255, 255, 255, 0.06)',
+  border: 'rgba(255, 255, 255, 0.08)',
+  borderHover: 'rgba(255, 255, 255, 0.15)',
 };
 
 // --- FAQ Data ---
@@ -118,8 +118,8 @@ const AccordionItem = ({
     <div
       style={{
         backgroundColor: isOpen ? colors.cardHover : colors.card,
-        borderColor: isOpen ? 'rgba(74, 158, 173, 0.2)' : colors.border,
-        boxShadow: isOpen ? '0 0 30px rgba(74, 158, 173, 0.08)' : 'none',
+        borderColor: isOpen ? 'rgba(255, 255, 255, 0.15)' : colors.border,
+        boxShadow: isOpen ? '0 0 30px rgba(255, 255, 255, 0.03)' : 'none',
       }}
       className="rounded-xl border transition-all duration-300"
     >
@@ -134,8 +134,8 @@ const AccordionItem = ({
         }}
         aria-expanded={isOpen}
         aria-controls={panelId}
-        className="w-full flex items-center justify-between p-5 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#162030] rounded-xl"
-        style={{ '--tw-ring-color': colors.accentBright } as React.CSSProperties}
+        className="w-full flex items-center justify-between p-5 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1a1a1a] rounded-xl"
+        style={{ '--tw-ring-color': colors.accent } as React.CSSProperties}
       >
         <span style={{ color: colors.textPrimary }} className="font-medium text-[15px] pr-4">
           {question}
@@ -176,6 +176,7 @@ const AccordionItem = ({
 // --- Main Page ---
 export default function HelpPage() {
   const [openItems, setOpenItems] = useState<Record<string, number | null>>({});
+  const [videoPlaying, setVideoPlaying] = useState(false);
   const location = useLocation();
   const baseId = useId();
 
@@ -190,7 +191,6 @@ export default function HelpPage() {
   useEffect(() => {
     const hash = location.hash;
     if (hash) {
-      // Delay to allow DOM to render
       const timer = setTimeout(() => {
         const el = document.querySelector(hash);
         el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -198,6 +198,19 @@ export default function HelpPage() {
       return () => clearTimeout(timer);
     }
   }, [location.hash]);
+
+  const handleVideoPlay = (e: React.MouseEvent<HTMLDivElement>) => {
+    const video = e.currentTarget.querySelector('video');
+    if (video) {
+      if (video.paused) {
+        video.play();
+        setVideoPlaying(true);
+      } else {
+        video.pause();
+        setVideoPlaying(false);
+      }
+    }
+  };
 
   return (
     <div
@@ -212,8 +225,8 @@ export default function HelpPage() {
         className="fixed inset-0 pointer-events-none z-0"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(255,255,255,0.008) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.008) 1px, transparent 1px)
+            linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)
           `,
           backgroundSize: '60px 60px',
         }}
@@ -223,7 +236,7 @@ export default function HelpPage() {
       <nav
         className="fixed top-0 left-0 right-0 z-50 border-b"
         style={{
-          background: 'rgba(12, 18, 25, 0.8)',
+          background: 'rgba(10, 10, 10, 0.85)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
           borderColor: colors.border,
@@ -241,16 +254,18 @@ export default function HelpPage() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-250"
             style={{
               backgroundColor: colors.accentGlow,
-              color: colors.accentBright,
-              border: `1px solid rgba(74, 158, 173, 0.2)`,
+              color: colors.accent,
+              border: `1px solid rgba(255, 255, 255, 0.12)`,
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.backgroundColor = 'rgba(74, 158, 173, 0.25)';
-              e.currentTarget.style.borderColor = 'rgba(74, 158, 173, 0.4)';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+              e.currentTarget.style.color = '#fff';
             }}
             onMouseLeave={e => {
               e.currentTarget.style.backgroundColor = colors.accentGlow;
-              e.currentTarget.style.borderColor = 'rgba(74, 158, 173, 0.2)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+              e.currentTarget.style.color = colors.accent;
             }}
           >
             <ArrowLeft className="w-4 h-4" />
@@ -272,7 +287,7 @@ export default function HelpPage() {
             className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-6"
             style={{
               backgroundColor: colors.accentGlow,
-              color: colors.accentBright,
+              color: colors.textSecondary,
             }}
           >
             Support
@@ -290,6 +305,51 @@ export default function HelpPage() {
             Find answers to common questions about shipping, returns, payments, and more.
           </p>
         </motion.div>
+
+        {/* Video Section */}
+        <FadeInSection className="mb-16">
+          <div
+            className="rounded-2xl overflow-hidden relative cursor-pointer group"
+            style={{
+              border: `1px solid ${colors.border}`,
+              boxShadow: '0 0 60px rgba(0, 0, 0, 0.4)',
+            }}
+            onClick={handleVideoPlay}
+          >
+            <video
+              className="w-full aspect-video object-cover"
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              poster=""
+              onPlay={() => setVideoPlaying(true)}
+              onPause={() => setVideoPlaying(false)}
+            >
+              <source src="/media/promovid.MP4" type="video/mp4" />
+            </video>
+            {/* Play overlay */}
+            <div
+              className="absolute inset-0 flex items-center justify-center transition-opacity duration-300"
+              style={{
+                background: videoPlaying ? 'transparent' : 'rgba(0, 0, 0, 0.4)',
+                opacity: videoPlaying ? 0 : 1,
+                pointerEvents: videoPlaying ? 'none' : 'auto',
+              }}
+            >
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                }}
+              >
+                <Play className="w-7 h-7 text-white ml-1" fill="white" />
+              </div>
+            </div>
+          </div>
+        </FadeInSection>
 
         {/* Section Nav Pills */}
         <motion.div
@@ -309,10 +369,10 @@ export default function HelpPage() {
                 border: `1px solid ${colors.border}`,
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = 'rgba(74, 158, 173, 0.3)';
-                e.currentTarget.style.color = colors.accentBright;
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                e.currentTarget.style.color = '#fff';
                 e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 4px 20px rgba(74, 158, 173, 0.1)';
+                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.3)';
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.borderColor = colors.border;
@@ -338,7 +398,7 @@ export default function HelpPage() {
                     className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ backgroundColor: colors.accentGlow }}
                   >
-                    <section.icon className="w-6 h-6" style={{ color: colors.accentBright }} />
+                    <section.icon className="w-6 h-6" style={{ color: colors.accent }} />
                   </div>
                   <div>
                     <h2
@@ -386,7 +446,7 @@ export default function HelpPage() {
             <div
               className="absolute top-0 left-0 right-0 h-px"
               style={{
-                background: `linear-gradient(90deg, transparent, ${colors.accent}, transparent)`,
+                background: `linear-gradient(90deg, transparent, ${colors.textMuted}, transparent)`,
               }}
             />
 
@@ -394,7 +454,7 @@ export default function HelpPage() {
               className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-5"
               style={{ backgroundColor: colors.accentGlow }}
             >
-              <Mail className="w-7 h-7" style={{ color: colors.accentBright }} />
+              <Mail className="w-7 h-7" style={{ color: colors.accent }} />
             </div>
 
             <h3
@@ -414,13 +474,13 @@ export default function HelpPage() {
               className="mb-6 text-sm"
               style={{ color: colors.textMuted }}
             >
-              <Mail className="w-4 h-4 inline-block mr-1.5 -mt-0.5" style={{ color: colors.accentBright }} />
+              <Mail className="w-4 h-4 inline-block mr-1.5 -mt-0.5" style={{ color: colors.accent }} />
               <a
                 href="mailto:babysitterbs9@gmail.com"
                 className="underline underline-offset-2 transition-colors"
-                style={{ color: colors.accentBright }}
+                style={{ color: colors.accent }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#fff'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = colors.accentBright; }}
+                onMouseLeave={e => { e.currentTarget.style.color = colors.accent; }}
               >
                 babysitterbs9@gmail.com
               </a>
@@ -430,18 +490,18 @@ export default function HelpPage() {
               href="mailto:babysitterbs9@gmail.com"
               className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold text-sm uppercase tracking-wider transition-all duration-250"
               style={{
-                backgroundColor: colors.accent,
-                color: '#fff',
-                boxShadow: `0 0 30px rgba(74, 158, 173, 0.3)`,
+                backgroundColor: '#fff',
+                color: '#000',
+                boxShadow: '0 0 30px rgba(255, 255, 255, 0.1)',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor = colors.accentBright;
-                e.currentTarget.style.boxShadow = '0 0 40px rgba(74, 158, 173, 0.5)';
+                e.currentTarget.style.backgroundColor = '#e5e5e5';
+                e.currentTarget.style.boxShadow = '0 0 40px rgba(255, 255, 255, 0.15)';
                 e.currentTarget.style.transform = 'translateY(-2px)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.backgroundColor = colors.accent;
-                e.currentTarget.style.boxShadow = '0 0 30px rgba(74, 158, 173, 0.3)';
+                e.currentTarget.style.backgroundColor = '#fff';
+                e.currentTarget.style.boxShadow = '0 0 30px rgba(255, 255, 255, 0.1)';
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
