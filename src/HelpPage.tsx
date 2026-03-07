@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useId } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronDown, Truck, RotateCcw, CreditCard, HelpCircle, Mail, ArrowLeft } from 'lucide-react';
+import { ChevronDown, Truck, RotateCcw, CreditCard, Mail, ArrowLeft } from 'lucide-react';
 import { useInView } from 'react-intersection-observer';
 
 // --- Colors ---
@@ -36,10 +36,6 @@ const faqSections = [
         question: 'Do you offer free delivery?',
         answer: 'Yes, free standard shipping is available on all orders over a qualifying amount. The threshold will be displayed at checkout.',
       },
-      {
-        question: 'Do you ship internationally?',
-        answer: 'Yes, we ship to most countries. International shipping costs are calculated at checkout based on your location and order weight.',
-      },
     ],
   },
   {
@@ -54,7 +50,7 @@ const faqSections = [
       },
       {
         question: 'How do I make a return?',
-        answer: 'Please visit our returns portal and enter your order number. You\'ll receive a prepaid shipping label and instructions to send back your item.',
+        answer: 'Please visit our Instagram @babysitter_bs and send us a DM.',
       },
     ],
   },
@@ -66,27 +62,11 @@ const faqSections = [
     items: [
       {
         question: 'What payment methods do you accept?',
-        answer: 'We accept Visa, MasterCard, American Express, and EFT. All transactions are securely processed via PayFast and encrypted.',
+        answer: 'All transactions are securely processed via PayFast and encrypted.',
       },
       {
         question: 'How can I track my order?',
         answer: 'A tracking link will be emailed to you once your order has shipped. You can also check your order status by contacting our support team.',
-      },
-    ],
-  },
-  {
-    id: 'support',
-    title: 'Products & Support',
-    subtitle: 'Account help and product information',
-    icon: HelpCircle,
-    items: [
-      {
-        question: 'How can I edit my account information?',
-        answer: 'Log in to your account and visit the "Account Details" section to update your personal information, address, and preferences.',
-      },
-      {
-        question: 'Where can I find a size guide?',
-        answer: 'Detailed sizing charts are available on each product page. Simply click the "Size Guide" link below the size selector to view measurements for that item.',
       },
     ],
   },
@@ -96,7 +76,7 @@ const navPills = [
   { label: 'Shipping', href: '#shipping', icon: Truck },
   { label: 'Returns', href: '#returns', icon: RotateCcw },
   { label: 'Payments', href: '#payments', icon: CreditCard },
-  { label: 'Support', href: '#support', icon: HelpCircle },
+  { label: 'Contact', href: '#contact', icon: Mail },
 ];
 
 // --- Animated Section Wrapper ---
@@ -123,57 +103,81 @@ const AccordionItem = ({
   answer,
   isOpen,
   onClick,
+  id,
 }: {
   question: string;
   answer: string;
   isOpen: boolean;
   onClick: () => void;
-}) => (
-  <div
-    style={{
-      backgroundColor: isOpen ? colors.cardHover : colors.card,
-      borderColor: isOpen ? 'rgba(74, 158, 173, 0.2)' : colors.border,
-      boxShadow: isOpen ? '0 0 30px rgba(74, 158, 173, 0.08)' : 'none',
-    }}
-    className="rounded-xl border transition-all duration-300"
-  >
-    <button
-      onClick={onClick}
-      className="w-full flex items-center justify-between p-5 text-left cursor-pointer"
-    >
-      <span style={{ color: colors.textPrimary }} className="font-medium text-[15px] pr-4">
-        {question}
-      </span>
-      <ChevronDown
-        className="w-5 h-5 flex-shrink-0 transition-transform"
-        style={{
-          color: isOpen ? colors.accentBright : colors.textMuted,
-          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-          transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s',
-        }}
-      />
-    </button>
+  id: string;
+}) => {
+  const buttonId = `${id}-button`;
+  const panelId = `${id}-panel`;
+
+  return (
     <div
       style={{
-        maxHeight: isOpen ? '200px' : '0',
-        opacity: isOpen ? 1 : 0,
-        transition: 'max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out',
-        overflow: 'hidden',
+        backgroundColor: isOpen ? colors.cardHover : colors.card,
+        borderColor: isOpen ? 'rgba(74, 158, 173, 0.2)' : colors.border,
+        boxShadow: isOpen ? '0 0 30px rgba(74, 158, 173, 0.08)' : 'none',
       }}
+      className="rounded-xl border transition-all duration-300"
     >
-      <p
-        style={{ color: colors.textSecondary }}
-        className="px-5 pb-5 text-[14px] leading-relaxed"
+      <button
+        id={buttonId}
+        onClick={onClick}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+        className="w-full flex items-center justify-between p-5 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#162030] rounded-xl"
+        style={{ '--tw-ring-color': colors.accentBright } as React.CSSProperties}
       >
-        {answer}
-      </p>
+        <span style={{ color: colors.textPrimary }} className="font-medium text-[15px] pr-4">
+          {question}
+        </span>
+        <ChevronDown
+          className="w-5 h-5 flex-shrink-0 transition-transform"
+          aria-hidden="true"
+          style={{
+            color: isOpen ? colors.accentBright : colors.textMuted,
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s',
+          }}
+        />
+      </button>
+      <div
+        id={panelId}
+        role="region"
+        aria-labelledby={buttonId}
+        hidden={!isOpen}
+        style={{
+          maxHeight: isOpen ? '200px' : '0',
+          opacity: isOpen ? 1 : 0,
+          transition: 'max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out',
+          overflow: 'hidden',
+        }}
+      >
+        <p
+          style={{ color: colors.textSecondary }}
+          className="px-5 pb-5 text-[14px] leading-relaxed"
+        >
+          {answer}
+        </p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // --- Main Page ---
 export default function HelpPage() {
   const [openItems, setOpenItems] = useState<Record<string, number | null>>({});
+  const location = useLocation();
+  const baseId = useId();
 
   const toggleItem = (sectionId: string, index: number) => {
     setOpenItems(prev => ({
@@ -182,16 +186,18 @@ export default function HelpPage() {
     }));
   };
 
-  // Handle hash scrolling on load
+  // Hash-based scrolling using useLocation()
   useEffect(() => {
-    const hash = window.location.hash;
+    const hash = location.hash;
     if (hash) {
-      setTimeout(() => {
+      // Delay to allow DOM to render
+      const timer = setTimeout(() => {
         const el = document.querySelector(hash);
-        el?.scrollIntoView({ behavior: 'smooth' });
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 300);
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, [location.hash]);
 
   return (
     <div
@@ -348,10 +354,11 @@ export default function HelpPage() {
                 </div>
 
                 {/* Accordion */}
-                <div className="space-y-3">
+                <div className="space-y-3" role="group" aria-label={section.title}>
                   {section.items.map((item, idx) => (
                     <AccordionItem
                       key={idx}
+                      id={`${baseId}-${section.id}-${idx}`}
                       question={item.question}
                       answer={item.answer}
                       isOpen={openItems[section.id] === idx}
@@ -367,10 +374,12 @@ export default function HelpPage() {
         {/* Contact CTA */}
         <FadeInSection className="mt-20">
           <div
+            id="contact"
             className="rounded-2xl p-8 sm:p-10 text-center relative overflow-hidden"
             style={{
               backgroundColor: colors.card,
               border: `1px solid ${colors.border}`,
+              scrollMarginTop: '100px',
             }}
           >
             {/* Top gradient line */}
@@ -395,10 +404,26 @@ export default function HelpPage() {
               Still have questions?
             </h3>
             <p
-              className="mb-6 max-w-md mx-auto"
+              className="mb-4 max-w-md mx-auto"
               style={{ color: colors.textSecondary }}
             >
               Our team is here to help. Reach out and we'll get back to you as soon as possible.
+            </p>
+
+            <p
+              className="mb-6 text-sm"
+              style={{ color: colors.textMuted }}
+            >
+              <Mail className="w-4 h-4 inline-block mr-1.5 -mt-0.5" style={{ color: colors.accentBright }} />
+              <a
+                href="mailto:babysitterbs9@gmail.com"
+                className="underline underline-offset-2 transition-colors"
+                style={{ color: colors.accentBright }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#fff'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = colors.accentBright; }}
+              >
+                babysitterbs9@gmail.com
+              </a>
             </p>
 
             <a

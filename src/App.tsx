@@ -1103,7 +1103,7 @@ const Footer = ({ onOpenPrivacy, onOpenTerms }: { onOpenPrivacy: () => void; onO
               <li><a href="/help" className={cn(linkHover, "transition-colors")}>FAQ</a></li>
               <li><a href="/help#shipping" className={cn(linkHover, "transition-colors")}>Shipping</a></li>
               <li><a href="/help#returns" className={cn(linkHover, "transition-colors")}>Returns</a></li>
-              <li><a href="/help#support" className={cn(linkHover, "transition-colors")}>Contact</a></li>
+              <li><a href="/help#contact" className={cn(linkHover, "transition-colors")}>Contact</a></li>
             </ul>
           </div>
 
