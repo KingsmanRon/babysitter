@@ -309,45 +309,40 @@ export default function HelpPage() {
 
         {/* Video Section */}
         <FadeInSection className="mb-16">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {['/media/promovid.MP4', '/media/bs SHOOT.mp4'].map((src, i) => (
+          <div
+            className="rounded-2xl overflow-hidden relative cursor-pointer group"
+            style={{
+              border: `1px solid ${colors.border}`,
+              boxShadow: '0 0 60px rgba(0, 0, 0, 0.4)',
+            }}
+            onClick={handleVideoPlay}
+          >
+            <video
+              className="w-full aspect-video object-cover"
+              muted
+              loop
+              playsInline
+              preload="metadata"
+            >
+              <source src="/media/bs SHOOT.mp4" type="video/mp4" />
+            </video>
+            <div
+              className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 video-overlay"
+              style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+              }}
+            >
               <div
-                key={i}
-                className="rounded-2xl overflow-hidden relative cursor-pointer group"
+                className="w-14 h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
                 style={{
-                  border: `1px solid ${colors.border}`,
-                  boxShadow: '0 0 60px rgba(0, 0, 0, 0.4)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
                 }}
-                onClick={handleVideoPlay}
               >
-                <video
-                  className="w-full aspect-video object-cover"
-                  muted
-                  loop
-                  playsInline
-                  preload="metadata"
-                >
-                  <source src={src} type="video/mp4" />
-                </video>
-                <div
-                  className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 video-overlay"
-                  style={{
-                    background: 'rgba(0, 0, 0, 0.4)',
-                  }}
-                >
-                  <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                    }}
-                  >
-                    <Play className="w-6 h-6 text-white ml-0.5" fill="white" />
-                  </div>
-                </div>
+                <Play className="w-6 h-6 text-white ml-0.5" fill="white" />
               </div>
-            ))}
+            </div>
           </div>
         </FadeInSection>
 
