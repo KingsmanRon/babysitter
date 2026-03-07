@@ -176,7 +176,6 @@ const AccordionItem = ({
 // --- Main Page ---
 export default function HelpPage() {
   const [openItems, setOpenItems] = useState<Record<string, number | null>>({});
-  const [videoPlaying, setVideoPlaying] = useState(false);
   const location = useLocation();
   const baseId = useId();
 
@@ -200,14 +199,16 @@ export default function HelpPage() {
   }, [location.hash]);
 
   const handleVideoPlay = (e: React.MouseEvent<HTMLDivElement>) => {
-    const video = e.currentTarget.querySelector('video');
+    const container = e.currentTarget;
+    const video = container.querySelector('video');
+    const overlay = container.querySelector('.video-overlay') as HTMLElement;
     if (video) {
       if (video.paused) {
         video.play();
-        setVideoPlaying(true);
+        if (overlay) { overlay.style.opacity = '0'; overlay.style.pointerEvents = 'none'; }
       } else {
         video.pause();
-        setVideoPlaying(false);
+        if (overlay) { overlay.style.opacity = '1'; overlay.style.pointerEvents = 'auto'; }
       }
     }
   };
@@ -308,46 +309,45 @@ export default function HelpPage() {
 
         {/* Video Section */}
         <FadeInSection className="mb-16">
-          <div
-            className="rounded-2xl overflow-hidden relative cursor-pointer group"
-            style={{
-              border: `1px solid ${colors.border}`,
-              boxShadow: '0 0 60px rgba(0, 0, 0, 0.4)',
-            }}
-            onClick={handleVideoPlay}
-          >
-            <video
-              className="w-full aspect-video object-cover"
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              poster=""
-              onPlay={() => setVideoPlaying(true)}
-              onPause={() => setVideoPlaying(false)}
-            >
-              <source src="/media/promovid.MP4" type="video/mp4" />
-            </video>
-            {/* Play overlay */}
-            <div
-              className="absolute inset-0 flex items-center justify-center transition-opacity duration-300"
-              style={{
-                background: videoPlaying ? 'transparent' : 'rgba(0, 0, 0, 0.4)',
-                opacity: videoPlaying ? 0 : 1,
-                pointerEvents: videoPlaying ? 'none' : 'auto',
-              }}
-            >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {['/media/promovid.MP4', '/media/bs SHOOT.mp4'].map((src, i) => (
               <div
-                className="w-16 h-16 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                key={i}
+                className="rounded-2xl overflow-hidden relative cursor-pointer group"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  border: `1px solid ${colors.border}`,
+                  boxShadow: '0 0 60px rgba(0, 0, 0, 0.4)',
                 }}
+                onClick={handleVideoPlay}
               >
-                <Play className="w-7 h-7 text-white ml-1" fill="white" />
+                <video
+                  className="w-full aspect-video object-cover"
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                >
+                  <source src={src} type="video/mp4" />
+                </video>
+                <div
+                  className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 video-overlay"
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.4)',
+                  }}
+                >
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                    style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                    }}
+                  >
+                    <Play className="w-6 h-6 text-white ml-0.5" fill="white" />
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
         </FadeInSection>
 
