@@ -1100,10 +1100,10 @@ const Footer = ({ onOpenPrivacy, onOpenTerms }: { onOpenPrivacy: () => void; onO
           <div>
             <h4 className="text-white font-semibold mb-4">Support</h4>
             <ul className="space-y-2 text-gray-500">
-              <li><a href="#" className={cn(linkHover, "transition-colors")}>FAQ</a></li>
-              <li><a href="#" className={cn(linkHover, "transition-colors")}>Shipping</a></li>
-              <li><a href="#" className={cn(linkHover, "transition-colors")}>Returns</a></li>
-              <li><a href="mailto:babysitterbs9@gmail.com" className={cn(linkHover, "transition-colors")}>Contact</a></li>
+              <li><a href="/help" className={cn(linkHover, "transition-colors")}>FAQ</a></li>
+              <li><a href="/help#shipping" className={cn(linkHover, "transition-colors")}>Shipping</a></li>
+              <li><a href="/help#returns" className={cn(linkHover, "transition-colors")}>Returns</a></li>
+              <li><a href="/help#support" className={cn(linkHover, "transition-colors")}>Contact</a></li>
             </ul>
           </div>
 
