@@ -1,26 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
-import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, Shield, Send, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, Shield, Send, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
+import { useProducts } from './hooks/useProducts';
+import { createOrder, createYocoCheckout, formatZAR, Product } from './lib/api';
 
-const PRODUCT = {
-  name: "BABYSITTER™",
-  price: 249,
-  description: "Premium streetwear crafted for everyday confidence. Featuring tailored fits, breathable fabrics, and timeless style for any occasion.",
-  video: "/media/promovid.MP4",
-  images: [
-    "/media/boygirl.jpeg",
-    "/media/boy.jpeg",
-    "/media/pinkracer.jpeg",
-    "/media/girl.jpeg",
-    "/media/greenracer.jpeg"
-  ],
-  sizes: ["XS", "S", "M", "L", "XL", "XXL"],
-};
+const PROMO_VIDEO = '/media/promovid.MP4';
 
-// --- Fix #1: Video play/pause now calls .play()/.pause() on the element ---
 const VideoSection = () => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -53,7 +41,6 @@ const VideoSection = () => {
         style={{ scale, opacity }}
         className="absolute inset-0"
       >
-        {/* Fix #9d: Added aria-label for video accessibility */}
         <video
           ref={videoRef}
           autoPlay
@@ -63,7 +50,7 @@ const VideoSection = () => {
           aria-label="Promotional video showcasing BABYSITTER clothing and accessories"
           className="w-full h-full object-cover opacity-90"
         >
-          <source src={PRODUCT.video} type="video/mp4" />
+          <source src={PROMO_VIDEO} type="video/mp4" />
         </video>
       </motion.div>
 
@@ -159,15 +146,14 @@ const VideoSection = () => {
   );
 };
 
-// --- Fix #3: ProductSection now receives lifted state via props ---
-// --- Fix #8: setTimeout is cleaned up on unmount via ref ---
 interface ProductSectionProps {
+  product: Product;
   selectedSize: string | null;
   setSelectedSize: (size: string | null) => void;
   onAddToCart: () => void;
 }
 
-const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductSectionProps) => {
+const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }: ProductSectionProps) => {
   const [currentImage, setCurrentImage] = useState(0);
   const [isAdded, setIsAdded] = useState(false);
   const addToCartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -184,6 +170,14 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
       }
     };
   }, []);
+
+  const images = product.images.length > 0
+    ? product.images
+    : product.image_url
+      ? [product.image_url]
+      : [];
+  const soldOut = product.stock_count <= 0;
+  const priceDisplay = formatZAR(product.price_cents);
 
   return (
     <section
@@ -204,41 +198,50 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
             className="relative"
           >
             <div className="relative aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900">
-              <motion.img
-                key={currentImage}
-                initial={{ opacity: 0, scale: 1.1 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5 }}
-                src={PRODUCT.images[currentImage]}
-                alt={PRODUCT.name}
-                className="w-full h-full object-contain"
-              />
+              {images[currentImage] && (
+                <motion.img
+                  key={currentImage}
+                  initial={{ opacity: 0, scale: 1.1 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.5 }}
+                  src={images[currentImage]}
+                  alt={product.name}
+                  className="w-full h-full object-contain"
+                />
+              )}
 
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
 
               <div className="absolute top-6 right-6">
-                <div className="px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full text-white font-bold text-sm">
-                  NEW
+                <div className={cn(
+                  "px-4 py-2 rounded-full text-white font-bold text-sm",
+                  soldOut
+                    ? "bg-gray-700"
+                    : "bg-gradient-to-r from-orange-500 to-pink-500"
+                )}>
+                  {soldOut ? "SOLD OUT" : "NEW"}
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-2 sm:gap-4 mt-4 sm:mt-6">
-              {PRODUCT.images.map((img, idx) => (
-                <motion.button
-                  key={idx}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setCurrentImage(idx)}
-                  className={cn(
-                    "flex-1 aspect-video rounded-xl overflow-hidden border-2 transition-all",
-                    currentImage === idx ? "border-purple-500" : "border-transparent opacity-50 hover:opacity-100"
-                  )}
-                >
-                  <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
-                </motion.button>
-              ))}
-            </div>
+            {images.length > 1 && (
+              <div className="flex gap-2 sm:gap-4 mt-4 sm:mt-6">
+                {images.map((img, idx) => (
+                  <motion.button
+                    key={idx}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setCurrentImage(idx)}
+                    className={cn(
+                      "flex-1 aspect-video rounded-xl overflow-hidden border-2 transition-all",
+                      currentImage === idx ? "border-purple-500" : "border-transparent opacity-50 hover:opacity-100"
+                    )}
+                  >
+                    <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+                  </motion.button>
+                ))}
+              </div>
+            )}
           </motion.div>
 
           <motion.div
@@ -257,26 +260,41 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                   Limited Edition
                 </span>
                 <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white mt-2 leading-tight">
-                  {PRODUCT.name}
+                  {product.name}
                 </h2>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
-                  <span className="text-3xl sm:text-4xl font-bold text-white">R{PRODUCT.price}</span>
-                  <span className="text-lg sm:text-xl text-gray-500 line-through">R450</span>
-                  <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
-                    33% OFF
-                  </span>
+                  <span className="text-3xl sm:text-4xl font-bold text-white">{priceDisplay}</span>
+                  {!soldOut && (
+                    <span className={cn(
+                      "px-3 py-1 rounded-full text-sm font-medium",
+                      product.stock_count <= 5
+                        ? "bg-orange-500/20 text-orange-300"
+                        : "bg-green-500/20 text-green-400"
+                    )}>
+                      {product.stock_count <= 5
+                        ? `Only ${product.stock_count} left`
+                        : "In stock"}
+                    </span>
+                  )}
+                  {soldOut && (
+                    <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm font-medium">
+                      Sold out
+                    </span>
+                  )}
                 </div>
               </motion.div>
             </div>
 
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.4 }}
-              className="text-gray-400 text-base sm:text-lg leading-relaxed"
-            >
-              {PRODUCT.description}
-            </motion.p>
+            {product.description && (
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ delay: 0.4 }}
+                className="text-gray-400 text-base sm:text-lg leading-relaxed"
+              >
+                {product.description}
+              </motion.p>
+            )}
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -292,7 +310,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
               </div>
 
               <div className="grid grid-cols-3 gap-3">
-                {PRODUCT.sizes.map((size, idx) => (
+                {product.sizes.map((size, idx) => (
                   <motion.button
                     key={size}
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -301,11 +319,13 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setSelectedSize(size)}
+                    disabled={soldOut}
                     className={cn(
                       "py-4 rounded-xl border-2 font-semibold text-lg transition-all duration-300",
                       selectedSize === size
                         ? "border-purple-500 bg-purple-500/20 text-white scale-105"
-                        : "border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600"
+                        : "border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600",
+                      soldOut && "opacity-50 cursor-not-allowed"
                     )}
                   >
                     {size}
@@ -321,26 +341,31 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
               className="space-y-4"
             >
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={soldOut || !selectedSize ? undefined : { scale: 1.02 }}
+                whileTap={soldOut || !selectedSize ? undefined : { scale: 0.98 }}
                 onClick={() => {
-                  if (selectedSize) {
+                  if (selectedSize && !soldOut) {
                     setIsAdded(true);
                     addToCartTimeoutRef.current = setTimeout(() => {
                       onAddToCart();
                       setIsAdded(false);
-                    }, 1000);
+                    }, 800);
                   }
                 }}
-                disabled={!selectedSize}
+                disabled={!selectedSize || soldOut}
                 className={cn(
                   "w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300",
-                  selectedSize
+                  selectedSize && !soldOut
                     ? "bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white hover:shadow-2xl hover:shadow-purple-500/25"
                     : "bg-gray-700 text-gray-500 cursor-not-allowed"
                 )}
               >
-                {isAdded ? (
+                {soldOut ? (
+                  <>
+                    <X className="w-6 h-6" />
+                    Sold Out
+                  </>
+                ) : isAdded ? (
                   <>
                     <Check className="w-6 h-6" />
                     Added to Cart!
@@ -348,7 +373,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                 ) : (
                   <>
                     <ShoppingBag className="w-6 h-6" />
-                    {selectedSize ? `Add to Cart - R${PRODUCT.price}` : "Select a Size"}
+                    {selectedSize ? `Add to Cart - ${priceDisplay}` : "Select a Size"}
                   </>
                 )}
               </motion.button>
@@ -360,7 +385,7 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
                 </div>
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4" />
-                  <span>PayFast Payment</span>
+                  <span>Yoco Payments</span>
                 </div>
               </div>
             </motion.div>
@@ -371,151 +396,21 @@ const ProductSection = ({ selectedSize, setSelectedSize, onAddToCart }: ProductS
   );
 };
 
-// PayFast configuration
-// ──────────────────────────────────────────────────────────────────────
-// HOW TO SET UP PAYFAST:
-//
-// 1. Create a PayFast account at https://www.payfast.co.za
-// 2. Go to Settings → Integration to get your merchant_id and merchant_key
-// 3. For testing, use the sandbox credentials below (already set):
-//      merchant_id:  10000100
-//      merchant_key: 46f0cd694581a
-//      passphrase:   (leave empty for sandbox)
-// 4. Set action_url to sandbox for testing:
-//      https://sandbox.payfast.co.za/eng/process
-// 5. For PRODUCTION, update:
-//      merchant_id  → your real Merchant ID from PayFast dashboard
-//      merchant_key → your real Merchant Key
-//      passphrase   → your passphrase from Settings → Integration
-//      action_url   → https://www.payfast.co.za/eng/process
-// 6. notify_url (ITN): When you have a backend server, set this to
-//    your server endpoint (e.g. https://yourdomain.co.za/api/payfast/notify)
-//    PayFast sends POST requests here to confirm payment status.
-//    Without this, you rely on the return_url redirect only.
-//
-// FLOW: Customer fills in details → clicks Pay → redirected to PayFast →
-//       pays via card/EFT/SnapScan → redirected back to return_url or cancel_url
-// ──────────────────────────────────────────────────────────────────────
-const PAYFAST_CONFIG = {
-  merchant_id: '10000100',
-  merchant_key: '46f0cd694581a',
-  passphrase: '',  // Set your passphrase for production (Settings → Integration)
-  action_url: 'https://sandbox.payfast.co.za/eng/process',
-  return_url: `${window.location.origin}${window.location.pathname}?payment=success`,
-  cancel_url: `${window.location.origin}${window.location.pathname}?payment=cancelled`,
-  notify_url: '',
-};
-
-// Generate PayFast MD5 signature (required for production)
-const generatePayFastSignature = (data: Record<string, string>, passphrase?: string): string => {
-  const params = Object.entries(data)
-    .filter(([, value]) => value !== '')
-    .map(([key, value]) => `${key}=${encodeURIComponent(value.trim()).replace(/%20/g, '+')}`)
-    .join('&');
-  const signatureString = passphrase ? `${params}&passphrase=${encodeURIComponent(passphrase.trim()).replace(/%20/g, '+')}` : params;
-  // MD5 hash — using SubtleCrypto would be async; for simplicity, we use a
-  // lightweight MD5 implementation inline. In production, consider a server-side
-  // signature generation for security.
-  return md5(signatureString);
-};
-
-// Lightweight MD5 implementation for PayFast signature
-function md5(string: string): string {
-  function md5cycle(x: number[], k: number[]) {
-    let a = x[0], b = x[1], c = x[2], d = x[3];
-    a = ff(a, b, c, d, k[0], 7, -680876936); d = ff(d, a, b, c, k[1], 12, -389564586);
-    c = ff(c, d, a, b, k[2], 17, 606105819); b = ff(b, c, d, a, k[3], 22, -1044525330);
-    a = ff(a, b, c, d, k[4], 7, -176418897); d = ff(d, a, b, c, k[5], 12, 1200080426);
-    c = ff(c, d, a, b, k[6], 17, -1473231341); b = ff(b, c, d, a, k[7], 22, -45705983);
-    a = ff(a, b, c, d, k[8], 7, 1770035416); d = ff(d, a, b, c, k[9], 12, -1958414417);
-    c = ff(c, d, a, b, k[10], 17, -42063); b = ff(b, c, d, a, k[11], 22, -1990404162);
-    a = ff(a, b, c, d, k[12], 7, 1804603682); d = ff(d, a, b, c, k[13], 12, -40341101);
-    c = ff(c, d, a, b, k[14], 17, -1502002290); b = ff(b, c, d, a, k[15], 22, 1236535329);
-    a = gg(a, b, c, d, k[1], 5, -165796510); d = gg(d, a, b, c, k[6], 9, -1069501632);
-    c = gg(c, d, a, b, k[11], 14, 643717713); b = gg(b, c, d, a, k[0], 20, -373897302);
-    a = gg(a, b, c, d, k[5], 5, -701558691); d = gg(d, a, b, c, k[10], 9, 38016083);
-    c = gg(c, d, a, b, k[15], 14, -660478335); b = gg(b, c, d, a, k[4], 20, -405537848);
-    a = gg(a, b, c, d, k[9], 5, 568446438); d = gg(d, a, b, c, k[14], 9, -1019803690);
-    c = gg(c, d, a, b, k[3], 14, -187363961); b = gg(b, c, d, a, k[8], 20, 1163531501);
-    a = gg(a, b, c, d, k[13], 5, -1444681467); d = gg(d, a, b, c, k[2], 9, -51403784);
-    c = gg(c, d, a, b, k[7], 14, 1735328473); b = gg(b, c, d, a, k[12], 20, -1926607734);
-    a = hh(a, b, c, d, k[5], 4, -378558); d = hh(d, a, b, c, k[8], 11, -2022574463);
-    c = hh(c, d, a, b, k[11], 16, 1839030562); b = hh(b, c, d, a, k[14], 23, -35309556);
-    a = hh(a, b, c, d, k[1], 4, -1530992060); d = hh(d, a, b, c, k[4], 11, 1272893353);
-    c = hh(c, d, a, b, k[7], 16, -155497632); b = hh(b, c, d, a, k[10], 23, -1094730640);
-    a = hh(a, b, c, d, k[13], 4, 681279174); d = hh(d, a, b, c, k[0], 11, -358537222);
-    c = hh(c, d, a, b, k[3], 16, -722521979); b = hh(b, c, d, a, k[6], 23, 76029189);
-    a = hh(a, b, c, d, k[9], 4, -640364487); d = hh(d, a, b, c, k[12], 11, -421815835);
-    c = hh(c, d, a, b, k[15], 16, 530742520); b = hh(b, c, d, a, k[2], 23, -995338651);
-    a = ii(a, b, c, d, k[0], 6, -198630844); d = ii(d, a, b, c, k[7], 10, 1126891415);
-    c = ii(c, d, a, b, k[14], 15, -1416354905); b = ii(b, c, d, a, k[5], 21, -57434055);
-    a = ii(a, b, c, d, k[12], 6, 1700485571); d = ii(d, a, b, c, k[3], 10, -1894986606);
-    c = ii(c, d, a, b, k[10], 15, -1051523); b = ii(b, c, d, a, k[1], 21, -2054922799);
-    a = ii(a, b, c, d, k[8], 6, 1873313359); d = ii(d, a, b, c, k[15], 10, -30611744);
-    c = ii(c, d, a, b, k[6], 15, -1560198380); b = ii(b, c, d, a, k[13], 21, 1309151649);
-    a = ii(a, b, c, d, k[4], 6, -145523070); d = ii(d, a, b, c, k[11], 10, -1120210379);
-    c = ii(c, d, a, b, k[2], 15, 718787259); b = ii(b, c, d, a, k[9], 21, -343485551);
-    x[0] = add32(a, x[0]); x[1] = add32(b, x[1]); x[2] = add32(c, x[2]); x[3] = add32(d, x[3]);
-  }
-  function cmn(q: number, a: number, b: number, x: number, s: number, t: number) {
-    a = add32(add32(a, q), add32(x, t));
-    return add32((a << s) | (a >>> (32 - s)), b);
-  }
-  function ff(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn((b & c) | ((~b) & d), a, b, x, s, t); }
-  function gg(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn((b & d) | (c & (~d)), a, b, x, s, t); }
-  function hh(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn(b ^ c ^ d, a, b, x, s, t); }
-  function ii(a: number, b: number, c: number, d: number, x: number, s: number, t: number) { return cmn(c ^ (b | (~d)), a, b, x, s, t); }
-  function md51(s: string) {
-    const n = s.length;
-    let state = [1732584193, -271733879, -1732584194, 271733878];
-    let i: number;
-    for (i = 64; i <= n; i += 64) {
-      md5cycle(state, md5blk(s.substring(i - 64, i)));
-    }
-    s = s.substring(i - 64);
-    const tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    for (i = 0; i < s.length; i++) tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3);
-    tail[i >> 2] |= 0x80 << ((i % 4) << 3);
-    if (i > 55) { md5cycle(state, tail); for (i = 0; i < 16; i++) tail[i] = 0; }
-    tail[14] = n * 8;
-    md5cycle(state, tail);
-    return state;
-  }
-  function md5blk(s: string) {
-    const md5blks: number[] = [];
-    for (let i = 0; i < 64; i += 4) {
-      md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
-    }
-    return md5blks;
-  }
-  const hex_chr = '0123456789abcdef'.split('');
-  function rhex(n: number) {
-    let s = '';
-    for (let j = 0; j < 4; j++) s += hex_chr[(n >> (j * 8 + 4)) & 0x0f] + hex_chr[(n >> (j * 8)) & 0x0f];
-    return s;
-  }
-  function add32(a: number, b: number) { return (a + b) & 0xFFFFFFFF; }
-  function hex(x: number[]) { return x.map(v => rhex(v)).join(''); }
-  return hex(md51(string));
+interface CheckoutModalProps {
+  product: Product;
+  size: string;
+  onClose: () => void;
 }
 
-// --- Fix #5: Order number generated once via useRef ---
-// --- Fix #6: size prop guarded with default ---
-// --- Fix #9c: Focus trapping in modal ---
-const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; size: string; onClose: () => void }) => {
-  const [step, setStep] = useState(1);
+const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
+  const [step, setStep] = useState<1 | 2>(1);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    name: "",
-  });
-  const [signature, setSignature] = useState('');
-  const orderNumber = useRef(`BS-${Math.random().toString(36).substr(2, 8).toUpperCase()}`);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [formData, setFormData] = useState({ email: "", name: "" });
   const modalRef = useRef<HTMLDivElement>(null);
 
   const stableOnClose = useCallback(onClose, [onClose]);
 
-  // Focus trapping
   useEffect(() => {
     const modal = modalRef.current;
     if (!modal) return;
@@ -551,35 +446,25 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [step, stableOnClose]);
 
-  const payfastFormRef = useRef<HTMLFormElement>(null);
-
-  const handlePayFastSubmit = () => {
+  const handlePay = async () => {
     setIsProcessing(true);
-
-    // Build the PayFast parameter object in the exact order PayFast expects
-    const pfData: Record<string, string> = {
-      merchant_id: PAYFAST_CONFIG.merchant_id,
-      merchant_key: PAYFAST_CONFIG.merchant_key,
-      return_url: PAYFAST_CONFIG.return_url,
-      cancel_url: PAYFAST_CONFIG.cancel_url,
-      ...(PAYFAST_CONFIG.notify_url ? { notify_url: PAYFAST_CONFIG.notify_url } : {}),
-      name_first: formData.name.split(' ')[0] || '',
-      name_last: formData.name.split(' ').slice(1).join(' ') || '',
-      email_address: formData.email,
-      m_payment_id: orderNumber.current,
-      amount: product.price.toFixed(2),
-      item_name: `${product.name} - Size ${size}`,
-    };
-
-    // Generate and set the signature, then submit on next render
-    const sig = generatePayFastSignature(pfData, PAYFAST_CONFIG.passphrase || undefined);
-    setSignature(sig);
-
-    // Use requestAnimationFrame to ensure the signature input is rendered before submit
-    requestAnimationFrame(() => {
-      payfastFormRef.current?.submit();
-    });
+    setErrorMsg(null);
+    try {
+      const order = await createOrder({
+        customerEmail: formData.email,
+        customerName: formData.name,
+        items: [{ productId: product.id, size, quantity: 1 }],
+      });
+      const { redirectUrl } = await createYocoCheckout(order.id);
+      window.location.href = redirectUrl;
+    } catch (err) {
+      setErrorMsg((err as Error).message || "Could not start checkout. Please try again.");
+      setIsProcessing(false);
+    }
   };
+
+  const priceDisplay = formatZAR(product.price_cents);
+  const primaryImage = product.images[0] ?? product.image_url ?? '';
 
   return (
     <motion.div
@@ -617,23 +502,19 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
               transition={{ delay: 0.2, type: "spring" }}
               className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center"
             >
-              {step === 3 ? (
-                <Check className="w-10 h-10 text-white" />
-              ) : (
-                <ShoppingBag className="w-10 h-10 text-white" />
-              )}
+              <ShoppingBag className="w-10 h-10 text-white" />
             </motion.div>
             <h2 className="text-2xl font-bold text-white">
-              {step === 1 ? "Checkout" : step === 2 ? "Payment" : "Order Confirmed!"}
+              {step === 1 ? "Checkout" : "Payment"}
             </h2>
             <p className="text-white/70 mt-1">
-              {step === 1 ? "Enter your details" : step === 2 ? "Complete your purchase" : "Thank you for your order"}
+              {step === 1 ? "Enter your details" : "Complete your purchase"}
             </p>
           </div>
 
           <div className="px-5 sm:px-8 py-2 bg-gray-800">
             <div className="flex items-center justify-between">
-              {[1, 2, 3].map((s) => (
+              {[1, 2].map((s) => (
                 <div key={s} className="flex items-center">
                   <div className={cn(
                     "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all",
@@ -641,7 +522,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
                   )}>
                     {s < step ? <Check className="w-4 h-4" /> : s}
                   </div>
-                  {s < 3 && (
+                  {s < 2 && (
                     <div className={cn(
                       "w-12 h-1 mx-2 rounded transition-all",
                       s < step ? "bg-purple-500" : "bg-gray-700"
@@ -701,11 +582,13 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
             >
               <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700 mb-6">
                 <div className="flex gap-4">
-                  <img src={product.images[0]} alt={product.name} className="w-20 h-20 rounded-lg object-cover" />
+                  {primaryImage && (
+                    <img src={primaryImage} alt={product.name} className="w-20 h-20 rounded-lg object-cover" />
+                  )}
                   <div className="flex-1">
                     <h3 className="font-semibold text-white">{product.name}</h3>
                     <p className="text-gray-400 text-sm">Size: {size}</p>
-                    <p className="text-purple-400 font-bold mt-1">R{product.price}</p>
+                    <p className="text-purple-400 font-bold mt-1">{priceDisplay}</p>
                   </div>
                 </div>
               </div>
@@ -713,7 +596,7 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
               <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700 space-y-2">
                 <div className="flex justify-between text-gray-400">
                   <span>Subtotal</span>
-                  <span>R{product.price}</span>
+                  <span>{priceDisplay}</span>
                 </div>
                 <div className="flex justify-between text-gray-400">
                   <span>Shipping</span>
@@ -721,54 +604,37 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
                 </div>
                 <div className="border-t border-gray-700 pt-2 flex justify-between text-white font-bold">
                   <span>Total</span>
-                  <span>R{product.price}</span>
+                  <span>{priceDisplay}</span>
                 </div>
               </div>
 
               <div className="p-4 bg-purple-500/10 rounded-xl border border-purple-500/20 text-center">
                 <p className="text-gray-300 text-sm">
-                  You'll be redirected to <span className="text-purple-400 font-semibold">PayFast</span> to complete your payment securely.
+                  You'll be redirected to <span className="text-purple-400 font-semibold">Yoco</span> to complete your payment securely.
                 </p>
               </div>
 
-              {/* Hidden PayFast form — submits directly to PayFast's hosted payment page */}
-              <form
-                ref={payfastFormRef}
-                action={PAYFAST_CONFIG.action_url}
-                method="POST"
-                className="hidden"
-              >
-                <input type="hidden" name="merchant_id" value={PAYFAST_CONFIG.merchant_id} />
-                <input type="hidden" name="merchant_key" value={PAYFAST_CONFIG.merchant_key} />
-                <input type="hidden" name="return_url" value={PAYFAST_CONFIG.return_url} />
-                <input type="hidden" name="cancel_url" value={PAYFAST_CONFIG.cancel_url} />
-                {PAYFAST_CONFIG.notify_url && (
-                  <input type="hidden" name="notify_url" value={PAYFAST_CONFIG.notify_url} />
-                )}
-                <input type="hidden" name="name_first" value={formData.name.split(' ')[0] || ''} />
-                <input type="hidden" name="name_last" value={formData.name.split(' ').slice(1).join(' ') || ''} />
-                <input type="hidden" name="email_address" value={formData.email} />
-                <input type="hidden" name="m_payment_id" value={orderNumber.current} />
-                <input type="hidden" name="amount" value={product.price.toFixed(2)} />
-                <input type="hidden" name="item_name" value={`${product.name} - Size ${size}`} />
-                {signature && <input type="hidden" name="signature" value={signature} />}
-              </form>
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+                  {errorMsg}
+                </div>
+              )}
 
               <button
                 type="button"
-                onClick={handlePayFastSubmit}
+                onClick={handlePay}
                 disabled={isProcessing}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isProcessing ? (
                   <div className="flex items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Redirecting to PayFast...
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Redirecting to Yoco...
                   </div>
                 ) : (
                   <>
                     <Shield className="w-5 h-5 inline-block mr-2" />
-                    Pay R{product.price} with PayFast
+                    Pay {priceDisplay} with Yoco
                   </>
                 )}
               </button>
@@ -776,44 +642,10 @@ const CheckoutModal = ({ product, size, onClose }: { product: typeof PRODUCT; si
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="w-full py-2 text-gray-400 hover:text-white transition-colors"
+                disabled={isProcessing}
+                className="w-full py-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
               >
                 ← Back
-              </button>
-            </motion.div>
-          )}
-
-          {step === 3 && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center space-y-6"
-            >
-              <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center">
-                <Check className="w-12 h-12 text-white" />
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-2xl font-bold text-white">Order Confirmed!</h3>
-                <p className="text-gray-400">Check your email for tracking information</p>
-              </div>
-
-              <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                <p className="text-sm text-gray-400">Order Number</p>
-                {/* Fix #5: Order number stable across re-renders */}
-                <p className="text-lg font-mono text-purple-400">{orderNumber.current}</p>
-              </div>
-
-              <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
-                <Shield className="w-4 h-4" />
-                <span>Protected by PayFast</span>
-              </div>
-
-              <button
-                onClick={onClose}
-                className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all"
-              >
-                Continue Shopping
               </button>
             </motion.div>
           )}
@@ -930,7 +762,6 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* Fix #9a: Dynamic copyright year */}
           <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} BABYSITTER. All rights reserved.</p>
           <div className="flex items-center gap-4 text-gray-500 text-sm">
             <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
@@ -968,71 +799,10 @@ const FloatingCart = ({ onClick, count }: { onClick: () => void; count: number }
   );
 };
 
-// --- Fix #3: Single source of truth for cart state, lifted to App ---
-// --- Fix #4: cartCount setter is now available and wired up ---
-// --- Fix #6: Modal only renders when selectedSize is truthy (no null assertion needed) ---
-// Detect PayFast return URL params
-const PaymentReturnBanner = () => {
-  const [status, setStatus] = useState<'success' | 'cancelled' | null>(null);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const payment = params.get('payment');
-    if (payment === 'success') setStatus('success');
-    else if (payment === 'cancelled') setStatus('cancelled');
-
-    // Clean up URL params after reading
-    if (payment) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('payment');
-      window.history.replaceState({}, '', url.pathname);
-    }
-  }, []);
-
-  if (!status) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: -50 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -50 }}
-        className="fixed top-4 left-4 right-4 z-50 mx-auto max-w-md"
-      >
-        <div className={cn(
-          "p-4 rounded-2xl border shadow-2xl backdrop-blur-lg flex items-center gap-3",
-          status === 'success'
-            ? "bg-green-500/20 border-green-500/30 text-green-400"
-            : "bg-orange-500/20 border-orange-500/30 text-orange-400"
-        )}>
-          {status === 'success' ? (
-            <Check className="w-6 h-6 flex-shrink-0" />
-          ) : (
-            <X className="w-6 h-6 flex-shrink-0" />
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm">
-              {status === 'success' ? 'Payment Successful!' : 'Payment Cancelled'}
-            </p>
-            <p className="text-xs opacity-75">
-              {status === 'success'
-                ? 'Your order has been placed. Check your email for confirmation.'
-                : 'Your payment was cancelled. No charges were made.'}
-            </p>
-          </div>
-          <button
-            onClick={() => setStatus(null)}
-            className="flex-shrink-0 p-1 rounded-full hover:bg-white/10"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
 export default function App() {
+  const { products, loading, error } = useProducts();
+  const product = products[0] ?? null;
+
   const [showCart, setShowCart] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -1050,27 +820,47 @@ export default function App() {
 
   return (
     <div className="bg-black min-h-screen">
-      <PaymentReturnBanner />
-
       <motion.div
         className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 z-50 origin-left"
         style={{ scaleX }}
       />
 
       <VideoSection />
-      <ProductSection
-        selectedSize={selectedSize}
-        setSelectedSize={setSelectedSize}
-        onAddToCart={handleAddToCart}
-      />
+
+      {loading && !product && (
+        <section className="min-h-[40vh] bg-black flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+        </section>
+      )}
+
+      {!loading && !product && (
+        <section className="min-h-[40vh] bg-black flex items-center justify-center px-6">
+          <div className="max-w-md text-center space-y-2">
+            <h3 className="text-xl font-bold text-white">No products available</h3>
+            <p className="text-gray-400 text-sm">
+              {error ?? "Check back soon — new drops coming."}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {product && (
+        <ProductSection
+          product={product}
+          selectedSize={selectedSize}
+          setSelectedSize={setSelectedSize}
+          onAddToCart={handleAddToCart}
+        />
+      )}
+
       <Footer />
 
       <FloatingCart onClick={() => setShowCart(true)} count={cartCount} />
 
       <AnimatePresence>
-        {showCart && selectedSize && (
+        {showCart && product && selectedSize && product.stock_count > 0 && (
           <CheckoutModal
-            product={PRODUCT}
+            product={product}
             size={selectedSize}
             onClose={() => setShowCart(false)}
           />
