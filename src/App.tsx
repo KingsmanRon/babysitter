@@ -216,8 +216,16 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
     : product.image_url
       ? [product.image_url]
       : [];
+  const hasDisplayImage = images.length > 1;
+  const isDisplayImage = hasDisplayImage && currentImage === 0;
   const soldOut = product.stock_count <= 0;
   const priceDisplay = formatZAR(product.price_cents);
+
+  useEffect(() => {
+    if (isDisplayImage) {
+      setSelectedSize(null);
+    }
+  }, [isDisplayImage, setSelectedSize]);
 
   return (
     <section
@@ -264,13 +272,15 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
               <div className="absolute top-6 right-6">
                 <div className={cn(
                   "px-4 py-2 rounded-full text-white font-bold text-sm",
-                  soldOut
-                    ? "bg-gray-700"
-                    : s
-                      ? "bg-white text-black"
-                      : "bg-gradient-to-r from-orange-500 to-pink-500"
+                  isDisplayImage
+                    ? "bg-black/60 backdrop-blur border border-white/20"
+                    : soldOut
+                      ? "bg-gray-700"
+                      : s
+                        ? "bg-white text-black"
+                        : "bg-gradient-to-r from-orange-500 to-pink-500"
                 )}>
-                  {soldOut ? "SOLD OUT" : "NEW"}
+                  {isDisplayImage ? "DISPLAY" : soldOut ? "SOLD OUT" : "NEW"}
                 </div>
               </div>
             </div>
@@ -283,14 +293,20 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setCurrentImage(idx)}
+                    aria-label={idx === 0 ? 'Display image' : `View product ${idx}`}
                     className={cn(
-                      "flex-1 aspect-video rounded-xl overflow-hidden border-2 transition-all",
+                      "relative flex-1 aspect-video rounded-xl overflow-hidden border-2 transition-all",
                       currentImage === idx
                         ? (s ? "border-white" : "border-purple-500")
                         : "border-transparent opacity-50 hover:opacity-100"
                     )}
                   >
-                    <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+                    <img src={img} alt={idx === 0 ? 'Display' : `View ${idx + 1}`} className="w-full h-full object-cover" />
+                    {idx === 0 && (
+                      <span className="absolute bottom-1 left-1 right-1 text-[10px] font-bold uppercase tracking-widest text-white bg-black/60 backdrop-blur rounded py-0.5">
+                        Display
+                      </span>
+                    )}
                   </motion.button>
                 ))}
               </div>
@@ -318,26 +334,28 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
                 <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white mt-2 leading-tight">
                   {product.name}
                 </h2>
-                <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
-                  <span className="text-3xl sm:text-4xl font-bold text-white">{priceDisplay}</span>
-                  {!soldOut && (
-                    <span className={cn(
-                      "px-3 py-1 rounded-full text-sm font-medium",
-                      product.stock_count <= 5
-                        ? "bg-orange-500/20 text-orange-300"
-                        : "bg-green-500/20 text-green-400"
-                    )}>
-                      {product.stock_count <= 5
-                        ? `Only ${product.stock_count} left`
-                        : "In stock"}
-                    </span>
-                  )}
-                  {soldOut && (
-                    <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm font-medium">
-                      Sold out
-                    </span>
-                  )}
-                </div>
+                {!isDisplayImage && (
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
+                    <span className="text-3xl sm:text-4xl font-bold text-white">{priceDisplay}</span>
+                    {!soldOut && (
+                      <span className={cn(
+                        "px-3 py-1 rounded-full text-sm font-medium",
+                        product.stock_count <= 5
+                          ? "bg-orange-500/20 text-orange-300"
+                          : "bg-green-500/20 text-green-400"
+                      )}>
+                        {product.stock_count <= 5
+                          ? `Only ${product.stock_count} left`
+                          : "In stock"}
+                      </span>
+                    )}
+                    {soldOut && (
+                      <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm font-medium">
+                        Sold out
+                      </span>
+                    )}
+                  </div>
+                )}
               </motion.div>
             </div>
 
@@ -352,106 +370,124 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
               </motion.p>
             )}
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.5 }}
-              className="space-y-4"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-white font-medium">Select Size</span>
-                <button className={cn(
-                  "text-sm underline",
-                  s ? "text-gray-300 hover:text-white" : "text-purple-400 hover:text-purple-300"
-                )}>
-                  Size Guide
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                {product.sizes.map((size, idx) => (
-                  <motion.button
-                    key={size}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={inView ? { opacity: 1, scale: 1 } : {}}
-                    transition={{ delay: 0.5 + idx * 0.05 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedSize(size)}
-                    disabled={soldOut}
-                    className={cn(
-                      "py-4 rounded-xl border-2 font-semibold text-lg transition-all duration-300",
-                      selectedSize === size
-                        ? s
-                          ? "border-white bg-white/10 text-white scale-105"
-                          : "border-purple-500 bg-purple-500/20 text-white scale-105"
-                        : "border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600",
-                      soldOut && "opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                    {size}
-                  </motion.button>
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.7 }}
-              className="space-y-4"
-            >
-              <motion.button
-                whileHover={soldOut || !selectedSize ? undefined : { scale: 1.02 }}
-                whileTap={soldOut || !selectedSize ? undefined : { scale: 0.98 }}
-                onClick={() => {
-                  if (selectedSize && !soldOut) {
-                    setIsAdded(true);
-                    addToCartTimeoutRef.current = setTimeout(() => {
-                      onAddToCart();
-                      setIsAdded(false);
-                    }, 800);
-                  }
-                }}
-                disabled={!selectedSize || soldOut}
+            {isDisplayImage ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ delay: 0.5 }}
                 className={cn(
-                  "w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300",
-                  selectedSize && !soldOut
-                    ? s
-                      ? "bg-white text-black hover:shadow-2xl hover:shadow-white/20"
-                      : "bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white hover:shadow-2xl hover:shadow-purple-500/25"
-                    : "bg-gray-700 text-gray-500 cursor-not-allowed"
+                  "rounded-2xl border p-5 text-center",
+                  s ? "bg-white/5 border-white/15" : "bg-white/5 border-white/10"
                 )}
               >
-                {soldOut ? (
-                  <>
-                    <X className="w-6 h-6" />
-                    Sold Out
-                  </>
-                ) : isAdded ? (
-                  <>
-                    <Check className="w-6 h-6" />
-                    Added to Cart!
-                  </>
-                ) : (
-                  <>
-                    <ShoppingBag className="w-6 h-6" />
-                    {selectedSize ? `Add to Cart - ${priceDisplay}` : "Select a Size"}
-                  </>
-                )}
-              </motion.button>
+                <p className="text-gray-300 text-sm sm:text-base">
+                  This is a display image. Select a product below to view sizes and add to cart.
+                </p>
+              </motion.div>
+            ) : (
+              <>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={inView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ delay: 0.5 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-medium">Select Size</span>
+                    <button className={cn(
+                      "text-sm underline",
+                      s ? "text-gray-300 hover:text-white" : "text-purple-400 hover:text-purple-300"
+                    )}>
+                      Size Guide
+                    </button>
+                  </div>
 
-              <div className="flex items-center justify-center gap-6 text-gray-500 text-sm">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  <span>Secure Checkout</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  <span>Yoco Payments</span>
-                </div>
-              </div>
-            </motion.div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {product.sizes.map((size, idx) => (
+                      <motion.button
+                        key={size}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={inView ? { opacity: 1, scale: 1 } : {}}
+                        transition={{ delay: 0.5 + idx * 0.05 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setSelectedSize(size)}
+                        disabled={soldOut}
+                        className={cn(
+                          "py-4 rounded-xl border-2 font-semibold text-lg transition-all duration-300",
+                          selectedSize === size
+                            ? s
+                              ? "border-white bg-white/10 text-white scale-105"
+                              : "border-purple-500 bg-purple-500/20 text-white scale-105"
+                            : "border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600",
+                          soldOut && "opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        {size}
+                      </motion.button>
+                    ))}
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={inView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ delay: 0.7 }}
+                  className="space-y-4"
+                >
+                  <motion.button
+                    whileHover={soldOut || !selectedSize ? undefined : { scale: 1.02 }}
+                    whileTap={soldOut || !selectedSize ? undefined : { scale: 0.98 }}
+                    onClick={() => {
+                      if (selectedSize && !soldOut) {
+                        setIsAdded(true);
+                        addToCartTimeoutRef.current = setTimeout(() => {
+                          onAddToCart();
+                          setIsAdded(false);
+                        }, 800);
+                      }
+                    }}
+                    disabled={!selectedSize || soldOut}
+                    className={cn(
+                      "w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300",
+                      selectedSize && !soldOut
+                        ? s
+                          ? "bg-white text-black hover:shadow-2xl hover:shadow-white/20"
+                          : "bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white hover:shadow-2xl hover:shadow-purple-500/25"
+                        : "bg-gray-700 text-gray-500 cursor-not-allowed"
+                    )}
+                  >
+                    {soldOut ? (
+                      <>
+                        <X className="w-6 h-6" />
+                        Sold Out
+                      </>
+                    ) : isAdded ? (
+                      <>
+                        <Check className="w-6 h-6" />
+                        Added to Cart!
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingBag className="w-6 h-6" />
+                        {selectedSize ? `Add to Cart - ${priceDisplay}` : "Select a Size"}
+                      </>
+                    )}
+                  </motion.button>
+
+                  <div className="flex items-center justify-center gap-6 text-gray-500 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
+                      <span>Secure Checkout</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
+                      <span>Yoco Payments</span>
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            )}
           </motion.div>
         </div>
       </div>
