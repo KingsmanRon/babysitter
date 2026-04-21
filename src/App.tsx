@@ -1,13 +1,51 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, createContext, useContext } from 'react';
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
-import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, Shield, Send, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, Shield, Send, Volume2, VolumeX, Loader2, Moon, Sun } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
 import { useProducts } from './hooks/useProducts';
 import { createOrder, createYocoCheckout, formatZAR, Product } from './lib/api';
+import { PrivacyPolicyModal, TermsOfServiceModal } from './LegalPages';
 
 const PROMO_VIDEO = '/media/promovid.MP4';
+
+type Theme = 'color' | 'stealth';
+const ThemeContext = createContext<{ theme: Theme; toggleTheme: () => void }>({
+  theme: 'color',
+  toggleTheme: () => {},
+});
+const useTheme = () => useContext(ThemeContext);
+
+const ThemeToggle = () => {
+  const { theme, toggleTheme } = useTheme();
+  const isStealth = theme === 'stealth';
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 2.2 }}
+      onClick={toggleTheme}
+      aria-label={isStealth ? 'Switch to color theme' : 'Switch to stealth theme'}
+      aria-pressed={isStealth}
+      className="fixed top-6 right-4 sm:right-8 z-40 flex items-center gap-2 px-3 py-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-white text-xs font-medium hover:bg-black/80 transition-colors"
+    >
+      <div className={cn(
+        "relative w-9 h-5 rounded-full transition-colors",
+        isStealth ? "bg-gray-600" : "bg-gradient-to-r from-purple-600 to-pink-600"
+      )}>
+        <motion.div
+          animate={{ x: isStealth ? 0 : 18 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white flex items-center justify-center"
+        >
+          {isStealth ? <Moon className="w-2.5 h-2.5 text-gray-700" /> : <Sun className="w-2.5 h-2.5 text-orange-500" />}
+        </motion.div>
+      </div>
+      <span className="hidden sm:block uppercase tracking-wider">{isStealth ? 'Stealth' : 'Color'}</span>
+    </motion.button>
+  );
+};
 
 const VideoSection = () => {
   const [isPlaying, setIsPlaying] = useState(true);
@@ -157,6 +195,8 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
   const [currentImage, setCurrentImage] = useState(0);
   const [isAdded, setIsAdded] = useState(false);
   const addToCartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { theme } = useTheme();
+  const s = theme === 'stealth';
 
   const { ref, inView } = useInView({
     threshold: 0.2,
@@ -182,11 +222,20 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
   return (
     <section
       ref={ref}
-      className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black py-12 sm:py-20 px-4 sm:px-6 relative overflow-hidden"
+      className={cn(
+        "min-h-screen py-12 sm:py-20 px-4 sm:px-6 relative overflow-hidden",
+        s ? "bg-[#0a0a0a]" : "bg-gradient-to-b from-black via-gray-900 to-black"
+      )}
     >
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl" />
+        <div className={cn(
+          "absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl",
+          s ? "bg-white/[0.03]" : "bg-purple-500/10"
+        )} />
+        <div className={cn(
+          "absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-3xl",
+          s ? "bg-white/[0.02]" : "bg-pink-500/10"
+        )} />
       </div>
 
       <div className="max-w-7xl mx-auto relative z-10">
@@ -217,7 +266,9 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
                   "px-4 py-2 rounded-full text-white font-bold text-sm",
                   soldOut
                     ? "bg-gray-700"
-                    : "bg-gradient-to-r from-orange-500 to-pink-500"
+                    : s
+                      ? "bg-white text-black"
+                      : "bg-gradient-to-r from-orange-500 to-pink-500"
                 )}>
                   {soldOut ? "SOLD OUT" : "NEW"}
                 </div>
@@ -234,7 +285,9 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
                     onClick={() => setCurrentImage(idx)}
                     className={cn(
                       "flex-1 aspect-video rounded-xl overflow-hidden border-2 transition-all",
-                      currentImage === idx ? "border-purple-500" : "border-transparent opacity-50 hover:opacity-100"
+                      currentImage === idx
+                        ? (s ? "border-white" : "border-purple-500")
+                        : "border-transparent opacity-50 hover:opacity-100"
                     )}
                   >
                     <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
@@ -256,7 +309,10 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
                 animate={inView ? { opacity: 1, y: 0 } : {}}
                 transition={{ delay: 0.3 }}
               >
-                <span className="text-purple-400 font-medium uppercase tracking-widest text-sm">
+                <span className={cn(
+                  "font-medium uppercase tracking-widest text-sm",
+                  s ? "text-gray-300" : "text-purple-400"
+                )}>
                   Limited Edition
                 </span>
                 <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white mt-2 leading-tight">
@@ -304,7 +360,10 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
             >
               <div className="flex items-center justify-between">
                 <span className="text-white font-medium">Select Size</span>
-                <button className="text-purple-400 text-sm underline hover:text-purple-300">
+                <button className={cn(
+                  "text-sm underline",
+                  s ? "text-gray-300 hover:text-white" : "text-purple-400 hover:text-purple-300"
+                )}>
                   Size Guide
                 </button>
               </div>
@@ -323,7 +382,9 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
                     className={cn(
                       "py-4 rounded-xl border-2 font-semibold text-lg transition-all duration-300",
                       selectedSize === size
-                        ? "border-purple-500 bg-purple-500/20 text-white scale-105"
+                        ? s
+                          ? "border-white bg-white/10 text-white scale-105"
+                          : "border-purple-500 bg-purple-500/20 text-white scale-105"
                         : "border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600",
                       soldOut && "opacity-50 cursor-not-allowed"
                     )}
@@ -356,7 +417,9 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
                 className={cn(
                   "w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300",
                   selectedSize && !soldOut
-                    ? "bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white hover:shadow-2xl hover:shadow-purple-500/25"
+                    ? s
+                      ? "bg-white text-black hover:shadow-2xl hover:shadow-white/20"
+                      : "bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white hover:shadow-2xl hover:shadow-purple-500/25"
                     : "bg-gray-700 text-gray-500 cursor-not-allowed"
                 )}
               >
@@ -407,7 +470,10 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [formData, setFormData] = useState({ email: "", name: "" });
+  const [consent, setConsent] = useState({ terms: false, marketing: false });
   const modalRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
+  const s = theme === 'stealth';
 
   const stableOnClose = useCallback(onClose, [onClose]);
 
@@ -495,12 +561,18 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
             <X className="w-5 h-5" />
           </button>
 
-          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 p-5 sm:p-8 text-center">
+          <div className={cn(
+            "p-5 sm:p-8 text-center",
+            s ? "bg-[#1a1a1a]" : "bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500"
+          )}>
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring" }}
-              className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center"
+              className={cn(
+                "w-20 h-20 mx-auto mb-4 rounded-2xl backdrop-blur flex items-center justify-center",
+                s ? "bg-white/10 border border-white/15" : "bg-white/20"
+              )}
             >
               <ShoppingBag className="w-10 h-10 text-white" />
             </motion.div>
@@ -514,18 +586,22 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
 
           <div className="px-5 sm:px-8 py-2 bg-gray-800">
             <div className="flex items-center justify-between">
-              {[1, 2].map((s) => (
-                <div key={s} className="flex items-center">
+              {[1, 2].map((stepNum) => (
+                <div key={stepNum} className="flex items-center">
                   <div className={cn(
                     "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all",
-                    s <= step ? "bg-purple-500 text-white" : "bg-gray-700 text-gray-500"
+                    stepNum <= step
+                      ? s ? "bg-white text-black" : "bg-purple-500 text-white"
+                      : "bg-gray-700 text-gray-500"
                   )}>
-                    {s < step ? <Check className="w-4 h-4" /> : s}
+                    {stepNum < step ? <Check className="w-4 h-4" /> : stepNum}
                   </div>
-                  {s < 2 && (
+                  {stepNum < 2 && (
                     <div className={cn(
                       "w-12 h-1 mx-2 rounded transition-all",
-                      s < step ? "bg-purple-500" : "bg-gray-700"
+                      stepNum < step
+                        ? s ? "bg-white" : "bg-purple-500"
+                        : "bg-gray-700"
                     )} />
                   )}
                 </div>
@@ -539,7 +615,7 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
             <motion.form
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              onSubmit={(e) => { e.preventDefault(); setStep(2); }}
+              onSubmit={(e) => { e.preventDefault(); if (consent.terms) setStep(2); }}
               className="space-y-4"
             >
               <div>
@@ -549,7 +625,10 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+                  className={cn(
+                    "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none transition-colors",
+                    s ? "focus:border-white" : "focus:border-purple-500"
+                  )}
                   placeholder="you@example.com"
                 />
               </div>
@@ -560,13 +639,65 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+                  className={cn(
+                    "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none transition-colors",
+                    s ? "focus:border-white" : "focus:border-purple-500"
+                  )}
                   placeholder="John Doe"
                 />
               </div>
+
+              <div className="space-y-3 pt-2">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={consent.terms}
+                    onChange={(e) => setConsent({ ...consent, terms: e.target.checked })}
+                    className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 accent-purple-500"
+                  />
+                  <span className="text-xs text-gray-400 leading-relaxed">
+                    I agree to the{' '}
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-terms'))}
+                      className={cn("underline", s ? "text-gray-300 hover:text-white" : "text-purple-400 hover:text-purple-300")}
+                    >
+                      Terms of Service
+                    </button>
+                    {' '}and{' '}
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-privacy'))}
+                      className={cn("underline", s ? "text-gray-300 hover:text-white" : "text-purple-400 hover:text-purple-300")}
+                    >
+                      Privacy Policy
+                    </button>
+                    . I consent to the processing of my personal information as described. <span className="text-red-400">*</span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={consent.marketing}
+                    onChange={(e) => setConsent({ ...consent, marketing: e.target.checked })}
+                    className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 accent-purple-500"
+                  />
+                  <span className="text-xs text-gray-400 leading-relaxed">
+                    I would like to receive marketing emails about new products and exclusive offers. (Optional)
+                  </span>
+                </label>
+              </div>
+
               <button
                 type="submit"
-                className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all"
+                disabled={!consent.terms}
+                className={cn(
+                  "w-full py-4 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+                  s
+                    ? "bg-white text-black hover:shadow-lg hover:shadow-white/20"
+                    : "bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-lg hover:shadow-purple-500/25"
+                )}
               >
                 Continue to Payment
                 <ArrowRight className="w-5 h-5 inline-block ml-2" />
@@ -588,7 +719,7 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
                   <div className="flex-1">
                     <h3 className="font-semibold text-white">{product.name}</h3>
                     <p className="text-gray-400 text-sm">Size: {size}</p>
-                    <p className="text-purple-400 font-bold mt-1">{priceDisplay}</p>
+                    <p className={cn("font-bold mt-1", s ? "text-white" : "text-purple-400")}>{priceDisplay}</p>
                   </div>
                 </div>
               </div>
@@ -608,9 +739,12 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
                 </div>
               </div>
 
-              <div className="p-4 bg-purple-500/10 rounded-xl border border-purple-500/20 text-center">
+              <div className={cn(
+                "p-4 rounded-xl border text-center",
+                s ? "bg-white/5 border-white/15" : "bg-purple-500/10 border-purple-500/20"
+              )}>
                 <p className="text-gray-300 text-sm">
-                  You'll be redirected to <span className="text-purple-400 font-semibold">Yoco</span> to complete your payment securely.
+                  You'll be redirected to <span className={cn("font-semibold", s ? "text-white" : "text-purple-400")}>Yoco</span> to complete your payment securely.
                 </p>
               </div>
 
@@ -624,7 +758,12 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
                 type="button"
                 onClick={handlePay}
                 disabled={isProcessing}
-                className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className={cn(
+                  "w-full py-4 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+                  s
+                    ? "bg-white text-black hover:shadow-lg hover:shadow-white/20"
+                    : "bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-lg hover:shadow-purple-500/25"
+                )}
               >
                 {isProcessing ? (
                   <div className="flex items-center justify-center gap-2">
@@ -658,6 +797,8 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
 const Newsletter = () => {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const { theme } = useTheme();
+  const s = theme === 'stealth';
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -695,12 +836,18 @@ const Newsletter = () => {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Enter email"
-          className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+          className={cn(
+            "flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none",
+            s ? "focus:border-white" : "focus:border-purple-500"
+          )}
         />
         <button
           type="submit"
           disabled={status === 'sending'}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+          className={cn(
+            "px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50",
+            s ? "bg-white text-black hover:bg-gray-200" : "bg-purple-600 hover:bg-purple-700"
+          )}
         >
           {status === 'sending' ? (
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -721,9 +868,20 @@ const Newsletter = () => {
   );
 };
 
-const Footer = () => {
+interface FooterProps {
+  onOpenPrivacy: () => void;
+  onOpenTerms: () => void;
+}
+
+const Footer = ({ onOpenPrivacy, onOpenTerms }: FooterProps) => {
+  const { theme } = useTheme();
+  const s = theme === 'stealth';
+  const linkHover = s ? "hover:text-gray-200" : "hover:text-purple-400";
   return (
-    <footer className="bg-black border-t border-gray-800 py-10 sm:py-16 px-4 sm:px-6">
+    <footer className={cn(
+      "border-t border-gray-800 py-10 sm:py-16 px-4 sm:px-6",
+      s ? "bg-[#0a0a0a]" : "bg-black"
+    )}>
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-12 mb-12">
           <div className="col-span-2 md:col-span-1 space-y-4">
@@ -733,26 +891,26 @@ const Footer = () => {
               </div>
               <span className="text-xl font-bold text-white">BABYSITTER</span>
             </div>
-            <p className="text-gray-500">Clothing & accessories for the bold.</p>
+            <p className="text-gray-500 uppercase tracking-[3px] text-xs">Changing the world one garment at a time.</p>
           </div>
 
           <div>
             <h4 className="text-white font-semibold mb-4">Shop</h4>
             <ul className="space-y-2 text-gray-500">
-              <li><a href="#" className="hover:text-purple-400 transition-colors">All Products</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">New Arrivals</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Best Sellers</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Sale</a></li>
+              <li><a href="#" className={cn("transition-colors", linkHover)}>All Products</a></li>
+              <li><a href="#" className={cn("transition-colors", linkHover)}>New Arrivals</a></li>
+              <li><a href="#" className={cn("transition-colors", linkHover)}>Best Sellers</a></li>
+              <li><a href="#" className={cn("transition-colors", linkHover)}>Sale</a></li>
             </ul>
           </div>
 
           <div>
             <h4 className="text-white font-semibold mb-4">Support</h4>
             <ul className="space-y-2 text-gray-500">
-              <li><a href="#" className="hover:text-purple-400 transition-colors">FAQ</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Shipping</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Returns</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Contact</a></li>
+              <li><a href="/help" className={cn("transition-colors", linkHover)}>FAQ</a></li>
+              <li><a href="/help#shipping" className={cn("transition-colors", linkHover)}>Shipping</a></li>
+              <li><a href="/help#returns" className={cn("transition-colors", linkHover)}>Returns</a></li>
+              <li><a href="/help#contact" className={cn("transition-colors", linkHover)}>Contact</a></li>
             </ul>
           </div>
 
@@ -764,9 +922,8 @@ const Footer = () => {
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} BABYSITTER. All rights reserved.</p>
           <div className="flex items-center gap-4 text-gray-500 text-sm">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-white transition-colors">Cookies</a>
+            <button onClick={onOpenPrivacy} className="hover:text-white transition-colors">Privacy Policy</button>
+            <button onClick={onOpenTerms} className="hover:text-white transition-colors">Terms of Service</button>
           </div>
         </div>
       </div>
@@ -775,6 +932,8 @@ const Footer = () => {
 };
 
 const FloatingCart = ({ onClick, count }: { onClick: () => void; count: number }) => {
+  const { theme } = useTheme();
+  const s = theme === 'stealth';
   return (
     <motion.button
       initial={{ scale: 0, rotate: -180 }}
@@ -783,14 +942,23 @@ const FloatingCart = ({ onClick, count }: { onClick: () => void; count: number }
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.9 }}
       onClick={onClick}
-      className="fixed bottom-5 right-5 sm:bottom-8 sm:right-8 z-40 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-2xl shadow-purple-500/25 flex items-center justify-center"
+      aria-label="Open cart"
+      className={cn(
+        "fixed bottom-5 right-5 sm:bottom-8 sm:right-8 z-40 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-2xl flex items-center justify-center",
+        s
+          ? "bg-white text-black shadow-white/20"
+          : "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-purple-500/25"
+      )}
     >
       <ShoppingBag className="w-6 h-6" />
       {count > 0 && (
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 rounded-full text-xs font-bold flex items-center justify-center"
+          className={cn(
+            "absolute -top-2 -right-2 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center",
+            s ? "bg-gray-800 text-white" : "bg-orange-500 text-white"
+          )}
         >
           {count}
         </motion.div>
@@ -803,9 +971,14 @@ export default function App() {
   const { products, loading, error } = useProducts();
   const product = products[0] ?? null;
 
+  const [theme, setTheme] = useState<Theme>('color');
+  const toggleTheme = useCallback(() => setTheme(t => t === 'color' ? 'stealth' : 'color'), []);
+
   const [showCart, setShowCart] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
@@ -813,59 +986,82 @@ export default function App() {
     restDelta: 0.001
   });
 
+  useEffect(() => {
+    const openPrivacy = () => setShowPrivacy(true);
+    const openTerms = () => setShowTerms(true);
+    window.addEventListener('open-privacy', openPrivacy);
+    window.addEventListener('open-terms', openTerms);
+    return () => {
+      window.removeEventListener('open-privacy', openPrivacy);
+      window.removeEventListener('open-terms', openTerms);
+    };
+  }, []);
+
   const handleAddToCart = () => {
     setCartCount(prev => prev + 1);
     setShowCart(true);
   };
 
+  const s = theme === 'stealth';
+
   return (
-    <div className="bg-black min-h-screen">
-      <motion.div
-        className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 z-50 origin-left"
-        style={{ scaleX }}
-      />
-
-      <VideoSection />
-
-      {loading && !product && (
-        <section className="min-h-[40vh] bg-black flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
-        </section>
-      )}
-
-      {!loading && !product && (
-        <section className="min-h-[40vh] bg-black flex items-center justify-center px-6">
-          <div className="max-w-md text-center space-y-2">
-            <h3 className="text-xl font-bold text-white">No products available</h3>
-            <p className="text-gray-400 text-sm">
-              {error ?? "Check back soon — new drops coming."}
-            </p>
-          </div>
-        </section>
-      )}
-
-      {product && (
-        <ProductSection
-          product={product}
-          selectedSize={selectedSize}
-          setSelectedSize={setSelectedSize}
-          onAddToCart={handleAddToCart}
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      <div className={cn("min-h-screen", s ? "bg-[#0a0a0a]" : "bg-black")}>
+        <motion.div
+          className={cn(
+            "fixed top-0 left-0 right-0 h-1 z-50 origin-left",
+            s ? "bg-white" : "bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500"
+          )}
+          style={{ scaleX }}
         />
-      )}
 
-      <Footer />
+        <ThemeToggle />
 
-      <FloatingCart onClick={() => setShowCart(true)} count={cartCount} />
+        <VideoSection />
 
-      <AnimatePresence>
-        {showCart && product && selectedSize && product.stock_count > 0 && (
-          <CheckoutModal
+        {loading && !product && (
+          <section className={cn("min-h-[40vh] flex items-center justify-center", s ? "bg-[#0a0a0a]" : "bg-black")}>
+            <Loader2 className={cn("w-8 h-8 animate-spin", s ? "text-white" : "text-purple-400")} />
+          </section>
+        )}
+
+        {!loading && !product && (
+          <section className={cn("min-h-[40vh] flex items-center justify-center px-6", s ? "bg-[#0a0a0a]" : "bg-black")}>
+            <div className="max-w-md text-center space-y-2">
+              <h3 className="text-xl font-bold text-white">No products available</h3>
+              <p className="text-gray-400 text-sm">
+                {error ?? "Check back soon — new drops coming."}
+              </p>
+            </div>
+          </section>
+        )}
+
+        {product && (
+          <ProductSection
             product={product}
-            size={selectedSize}
-            onClose={() => setShowCart(false)}
+            selectedSize={selectedSize}
+            setSelectedSize={setSelectedSize}
+            onAddToCart={handleAddToCart}
           />
         )}
-      </AnimatePresence>
-    </div>
+
+        <Footer onOpenPrivacy={() => setShowPrivacy(true)} onOpenTerms={() => setShowTerms(true)} />
+
+        <FloatingCart onClick={() => setShowCart(true)} count={cartCount} />
+
+        <AnimatePresence>
+          {showCart && product && selectedSize && product.stock_count > 0 && (
+            <CheckoutModal
+              product={product}
+              size={selectedSize}
+              onClose={() => setShowCart(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        <PrivacyPolicyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+        <TermsOfServiceModal isOpen={showTerms} onClose={() => setShowTerms(false)} />
+      </div>
+    </ThemeContext.Provider>
   );
 }
