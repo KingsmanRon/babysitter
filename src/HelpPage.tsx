@@ -308,15 +308,16 @@ export default function HelpPage() {
           >
             <video
               className="w-full aspect-video object-cover"
+              autoPlay
               muted
               loop
               playsInline
-              preload="metadata"
+              preload="auto"
             >
-              <source src="/media/promovid.MP4" type="video/mp4" />
+              <source src="/media/bs%20SHOOT.mp4" type="video/mp4" />
             </video>
             <div
-              className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 video-overlay"
+              className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 video-overlay pointer-events-none opacity-0"
               style={{
                 background: 'rgba(0, 0, 0, 0.4)',
               }}
