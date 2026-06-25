@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { formatZAR } from "../lib/api";
+import { formatZarFromCents } from "../lib/api";
 
 type AdminSummary = {
   orders: Array<{
@@ -125,7 +125,7 @@ export default function Admin() {
                       <tr key={p.id} className="border-t border-gray-800">
                         <td className="p-3">{p.name}</td>
                         <td className="p-3 font-mono text-xs text-gray-400">{p.slug}</td>
-                        <td className="p-3 text-right">{formatZAR(p.price_cents)}</td>
+                        <td className="p-3 text-right">{formatZarFromCents(p.price_cents)}</td>
                         <td className="p-3 text-right font-semibold">{p.stock_count}</td>
                         <td className="p-3 text-right">{p.is_active ? "yes" : "no"}</td>
                       </tr>
@@ -165,7 +165,7 @@ export default function Admin() {
                             {o.status}
                           </span>
                         </td>
-                        <td className="p-3 text-right">{formatZAR(o.amount_cents)}</td>
+                        <td className="p-3 text-right">{formatZarFromCents(o.amount_cents)}</td>
                         <td className="p-3">
                           <div>{o.customer_name || "—"}</div>
                           <div className="text-xs text-gray-500">{o.customer_email || "—"}</div>
@@ -205,7 +205,7 @@ export default function Admin() {
                           {t.provider_payment_id || "—"}
                         </td>
                         <td className="p-3">{t.provider_status || "—"}</td>
-                        <td className="p-3 text-right">{formatZAR(t.amount_cents)}</td>
+                        <td className="p-3 text-right">{formatZarFromCents(t.amount_cents)}</td>
                         <td className="p-3">
                           {t.payment_method_brand
                             ? `${t.payment_method_brand}${t.payment_method_last4 ? ` ···${t.payment_method_last4}` : ""}`

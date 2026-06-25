@@ -86,6 +86,8 @@ export async function fetchOrder(id: string): Promise<{ order: Order; items: Ord
   return asJson<{ order: Order; items: OrderItem[] }>(res);
 }
 
-export function formatZAR(cents: number): string {
-  return `R${(cents / 100).toFixed(2)}`;
+export function formatZarFromCents(cents: number): string {
+  return new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(cents / 100);
 }
+
+export const formatZAR = formatZarFromCents;
