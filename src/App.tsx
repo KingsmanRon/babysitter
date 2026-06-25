@@ -5,7 +5,7 @@ import emailjs from '@emailjs/browser';
 import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
 import { useProducts } from './hooks/useProducts';
-import { createOrder, createYocoCheckout, formatZAR, Product } from './lib/api';
+import { createOrder, createYocoCheckout, formatZAR, getActiveSale, getEffectiveDisplayPriceCents, Product } from './lib/api';
 import { PrivacyPolicyModal, TermsOfServiceModal } from './LegalPages';
 
 const PROMO_VIDEO = '/media/promovid.MP4';
@@ -219,7 +219,12 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
   const hasDisplayImage = images.length > 1;
   const isDisplayImage = hasDisplayImage && currentImage === 0;
   const soldOut = product.stock_count <= 0;
-  const priceDisplay = formatZAR(product.price_cents);
+  const activeSale = getActiveSale(product);
+  const priceDisplay = formatZAR(getEffectiveDisplayPriceCents(product));
+  const wasPriceDisplay = activeSale ? formatZAR(activeSale.compareAtPriceCents) : null;
+  const discountPercentDisplay = activeSale?.discountPercent == null
+    ? null
+    : `${Number.isInteger(activeSale.discountPercent) ? activeSale.discountPercent : activeSale.discountPercent.toFixed(2)}% off`;
 
   useEffect(() => {
     if (isDisplayImage) {
@@ -336,7 +341,24 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
                 </h2>
                 {!isDisplayImage && (
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4">
-                    <span className="text-3xl sm:text-4xl font-bold text-white">{priceDisplay}</span>
+                    {activeSale ? (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex flex-wrap items-baseline gap-3">
+                          <span className="text-lg sm:text-xl font-semibold text-gray-400 line-through">Was {wasPriceDisplay}</span>
+                          {discountPercentDisplay && (
+                            <span className={cn(
+                              "px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wide",
+                              s ? "bg-white text-black" : "bg-orange-500/20 text-orange-300"
+                            )}>
+                              {discountPercentDisplay}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-3xl sm:text-4xl font-bold text-white">Now {priceDisplay}</span>
+                      </div>
+                    ) : (
+                      <span className="text-3xl sm:text-4xl font-bold text-white">{priceDisplay}</span>
+                    )}
                     {!soldOut && (
                       <span className={cn(
                         "px-3 py-1 rounded-full text-sm font-medium",
@@ -565,7 +587,7 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
     }
   };
 
-  const priceDisplay = formatZAR(product.price_cents);
+  const priceDisplay = formatZAR(getEffectiveDisplayPriceCents(product));
   const primaryImage = product.images[0] ?? product.image_url ?? '';
 
   return (
