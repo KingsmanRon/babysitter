@@ -265,6 +265,17 @@ function header(
 // ──────────────────────────────────────────────────────────────
 // handleYocoWebhook — persist + fulfil
 // ──────────────────────────────────────────────────────────────
+function webhookEventTimestamp(event: YocoWebhookEvent): string {
+  if (event.createdDate) {
+    const parsed = new Date(event.createdDate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return event.createdDate;
+    }
+  }
+
+  return new Date().toISOString();
+}
+
 export async function handleYocoWebhook(
   event: YocoWebhookEvent,
   rawHeaders: Record<string, string | string[] | undefined>,
@@ -352,7 +363,7 @@ async function processPaymentSucceeded(event: YocoWebhookEvent) {
       eventType,
       payment,
     },
-    paid_at: new Date().toISOString(),
+    paid_at: webhookEventTimestamp(event),
     failed_at: null,
   };
 
@@ -474,7 +485,7 @@ async function processPaymentFailed(event: YocoWebhookEvent) {
       eventType,
       payment,
     },
-    failed_at: new Date().toISOString(),
+    failed_at: webhookEventTimestamp(event),
   };
 
   const { data: updatedTx, error: updateErr } = await db
