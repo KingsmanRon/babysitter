@@ -262,6 +262,11 @@ function header(
   return v;
 }
 
+function eventTimestamp(event: YocoWebhookEvent): string {
+  const timestamp = event.createdDate || new Date().toISOString();
+  return Number.isNaN(Date.parse(timestamp)) ? new Date().toISOString() : timestamp;
+}
+
 // ──────────────────────────────────────────────────────────────
 // handleYocoWebhook — persist + fulfil
 // ──────────────────────────────────────────────────────────────
@@ -357,7 +362,7 @@ async function processPaymentSucceeded(event: YocoWebhookEvent) {
     payment_method_brand: card?.scheme || null,
     payment_method_last4: last4,
     raw_metadata_json: event.payload as unknown as Record<string, unknown>,
-    paid_at: new Date().toISOString(),
+    paid_at: eventTimestamp(event),
     failed_at: null,
   };
 
@@ -462,7 +467,7 @@ async function processPaymentFailed(event: YocoWebhookEvent) {
     currency: event.payload.currency ?? "ZAR",
     processing_mode: event.payload.mode || processingMode(),
     raw_metadata_json: event.payload as unknown as Record<string, unknown>,
-    failed_at: new Date().toISOString(),
+    failed_at: eventTimestamp(event),
   };
 
   if (transactionId) {
