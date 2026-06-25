@@ -12,11 +12,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  const token = process.env.ADMIN_TOKEN;
+  const token = process.env.ADMIN_TOKEN?.trim();
   if (!token) {
     return res.status(503).json({ error: "ADMIN_TOKEN not configured" });
   }
-  const provided = (req.headers["x-admin-token"] || req.query.token || "") as string;
+  const rawProvided = (req.headers["x-admin-token"] || req.query.token || "") as string | string[];
+  const provided = (Array.isArray(rawProvided) ? rawProvided[0] ?? "" : rawProvided).trim();
   if (provided !== token) return unauthorized(res);
 
   try {
