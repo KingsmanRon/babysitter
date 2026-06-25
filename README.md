@@ -146,6 +146,54 @@ Example:
 curl -H "X-Admin-Token: $ADMIN_TOKEN" https://<your-vercel-url>/api/admin/summary
 ```
 
+
+## Manual discount fallback
+
+If the admin discount controls are unavailable, you can apply or remove a BABYSITTER product discount directly in the Supabase SQL Editor. These statements use the sale pricing columns added in `supabase/migrations/0002_sale_pricing_snapshots.sql`.
+
+To apply a 30% discount immediately with no scheduled end time, run:
+
+```sql
+update public.products
+set
+  compare_at_price_cents = price_cents,
+  sale_price_cents = round(price_cents * 0.70),
+  discount_percent_bps = 3000,
+  sale_starts_at = null,
+  sale_ends_at = null
+where slug = 'babysitter';
+```
+
+To schedule the same 30% discount for a specific window, replace the timestamps with your desired `timestamptz` values:
+
+```sql
+update public.products
+set
+  compare_at_price_cents = price_cents,
+  sale_price_cents = round(price_cents * 0.70),
+  discount_percent_bps = 3000,
+  sale_starts_at = '2026-07-01 00:00:00+00',
+  sale_ends_at = '2026-07-08 00:00:00+00'
+where slug = 'babysitter';
+```
+
+Use `null` for either timestamp when you want that side of the sale window to be open-ended. For example, `sale_starts_at = null` starts the sale immediately, and `sale_ends_at = null` leaves it active until manually removed.
+
+To remove the manual discount and return the product to its regular price, run:
+
+```sql
+update public.products
+set
+  compare_at_price_cents = null,
+  sale_price_cents = null,
+  discount_percent_bps = null,
+  sale_starts_at = null,
+  sale_ends_at = null
+where slug = 'babysitter';
+```
+
+After applying or removing the discount, verify `/admin` shows the expected product pricing and confirm the storefront displays the expected BABYSITTER price before accepting orders.
+
 ## File map
 
 ### Frontend
