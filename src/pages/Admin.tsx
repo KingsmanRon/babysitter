@@ -19,6 +19,13 @@ type AdminSummary = {
     currency: string;
     customer_email: string | null;
     customer_name: string | null;
+    ship_phone: string | null;
+    ship_line1: string | null;
+    ship_line2: string | null;
+    ship_suburb: string | null;
+    ship_city: string | null;
+    ship_province: string | null;
+    ship_postal_code: string | null;
     created_at: string;
   }>;
   transactions: Array<{
@@ -320,6 +327,7 @@ export default function Admin() {
                       <th className="text-left p-3">Status</th>
                       <th className="text-right p-3">Amount</th>
                       <th className="text-left p-3">Customer</th>
+                      <th className="text-left p-3">Deliver to</th>
                       <th className="text-left p-3">Created</th>
                     </tr>
                   </thead>
@@ -344,6 +352,18 @@ export default function Admin() {
                         <td className="p-3">
                           <div>{o.customer_name || "—"}</div>
                           <div className="text-xs text-gray-500">{o.customer_email || "—"}</div>
+                        </td>
+                        <td className="p-3 text-xs text-gray-400 max-w-xs">
+                          {o.ship_line1 ? (
+                            <>
+                              <div>{[o.ship_line1, o.ship_line2].filter(Boolean).join(", ")}</div>
+                              <div>{[o.ship_suburb, o.ship_city].filter(Boolean).join(", ")}</div>
+                              <div>{[o.ship_province, o.ship_postal_code].filter(Boolean).join(" ")}</div>
+                              {o.ship_phone && <div>{o.ship_phone}</div>}
+                            </>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="p-3 text-xs text-gray-400">
                           {new Date(o.created_at).toLocaleString()}

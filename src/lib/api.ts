@@ -63,9 +63,20 @@ export async function fetchProducts(): Promise<Product[]> {
   return data.products;
 }
 
+export type ShippingAddress = {
+  phone: string;
+  line1: string;
+  line2?: string;
+  suburb: string;
+  city: string;
+  province: string;
+  postalCode: string;
+};
+
 export async function createOrder(input: {
   customerEmail: string;
   customerName: string;
+  shipping: ShippingAddress;
   items: Array<{ productId: string; size?: string; quantity: number }>;
 }): Promise<Order> {
   const res = await fetch("/api/orders/create", {

@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: orders } = await db
       .from("orders")
       .select(
-        "id, order_number, status, amount_cents, currency, customer_email, customer_name, created_at, updated_at",
+        "id, order_number, status, amount_cents, currency, customer_email, customer_name, ship_phone, ship_line1, ship_line2, ship_suburb, ship_city, ship_province, ship_postal_code, created_at, updated_at",
       )
       .order("created_at", { ascending: false })
       .limit(100);
