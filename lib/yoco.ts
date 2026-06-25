@@ -262,6 +262,11 @@ function header(
   return v;
 }
 
+function eventTimestamp(event: YocoWebhookEvent): string {
+  const timestamp = event.createdDate || new Date().toISOString();
+  return Number.isNaN(Date.parse(timestamp)) ? new Date().toISOString() : timestamp;
+}
+
 // ──────────────────────────────────────────────────────────────
 // handleYocoWebhook — persist + fulfil
 // ──────────────────────────────────────────────────────────────
@@ -320,51 +325,70 @@ export async function handleYocoWebhook(
 // ──────────────────────────────────────────────────────────────
 async function processPaymentSucceeded(event: YocoWebhookEvent) {
   const db = supabaseAdmin();
-  const orderId = await resolveOrderId(event);
+  const eventId = event.id;
+  const eventType = event.type;
+  const payment = event.payload;
+  const orderId = payment.metadata?.orderId || (await resolveOrderId(event));
   if (!orderId) {
-    log.error("yoco.webhook.no_order_match", { eventId: event.id });
+    log.error("yoco.webhook.no_order_match", { eventId });
     return;
   }
 
-  const checkoutId = event.payload.checkoutId || null;
-  const paymentId = event.payload.id || null;
-  const card = event.payload.paymentMethodDetails?.card;
+  const checkoutId = payment.metadata?.checkoutId || payment.checkoutId || null;
+  const paymentId = payment.id || null;
+  const card = payment.paymentMethodDetails?.card;
   const last4 = card?.maskedCard ? card.maskedCard.slice(-4) : null;
-
-  // Update existing transaction (matched by checkout id), else insert a new one.
-  let transactionId: string | null = null;
-  if (checkoutId) {
-    const { data: tx } = await db
-      .from("payment_transactions")
-      .select("id")
-      .eq("order_id", orderId)
-      .eq("provider_checkout_id", checkoutId)
-      .maybeSingle();
-    transactionId = tx?.id || null;
-  }
 
   const txPayload = {
     order_id: orderId,
     provider: "yoco",
     provider_checkout_id: checkoutId,
     provider_payment_id: paymentId,
-    provider_event_id: event.id,
+    provider_event_id: eventId,
     provider_status: "succeeded",
-    amount_cents: event.payload.amount ?? 0,
-    currency: event.payload.currency ?? "ZAR",
-    processing_mode: event.payload.mode || processingMode(),
-    payment_method_type: event.payload.paymentMethodDetails?.type || null,
+    amount_cents: payment.amount ?? 0,
+    currency: payment.currency ?? "ZAR",
+    processing_mode: payment.mode || processingMode(),
+    payment_method_type: payment.paymentMethodDetails?.type || null,
     payment_method_brand: card?.scheme || null,
     payment_method_last4: last4,
-    raw_metadata_json: event.payload as unknown as Record<string, unknown>,
-    paid_at: new Date().toISOString(),
+    raw_metadata_json: {
+      eventId,
+      eventType,
+      payment,
+    },
+    paid_at: eventTimestamp(event),
     failed_at: null,
   };
 
-  if (transactionId) {
-    await db.from("payment_transactions").update(txPayload).eq("id", transactionId);
-  } else {
-    await db.from("payment_transactions").insert(txPayload);
+  const { data: updatedTx, error: updateErr } = await db
+    .from("payment_transactions")
+    .update(txPayload)
+    .eq("provider", "yoco")
+    .eq("order_id", orderId)
+    .eq("provider_checkout_id", checkoutId)
+    .select("id")
+    .maybeSingle();
+
+  if (updateErr) {
+    log.error("yoco.webhook.transaction_update_failed", {
+      orderId,
+      checkoutId,
+      eventId,
+      err: updateErr.message,
+    });
+  }
+
+  if (!updatedTx) {
+    const { error: insertErr } = await db.from("payment_transactions").insert(txPayload);
+    if (insertErr) {
+      log.error("yoco.webhook.transaction_insert_failed", {
+        orderId,
+        checkoutId,
+        eventId,
+        err: insertErr.message,
+      });
+    }
   }
 
   // Only fulfil once: guard by current status.
@@ -375,7 +399,7 @@ async function processPaymentSucceeded(event: YocoWebhookEvent) {
     .single();
 
   if (orderBefore && orderBefore.status === "paid") {
-    log.info("yoco.webhook.already_paid", { orderId, eventId: event.id });
+    log.info("yoco.webhook.already_paid", { orderId, eventId });
     return;
   }
 
@@ -426,49 +450,68 @@ async function processPaymentSucceeded(event: YocoWebhookEvent) {
       .eq("id", orderId);
   }
 
-  log.info("yoco.webhook.paid", { orderId, eventId: event.id, paymentId });
+  log.info("yoco.webhook.paid", { orderId, eventId, paymentId });
 }
-
 async function processPaymentFailed(event: YocoWebhookEvent) {
   const db = supabaseAdmin();
-  const orderId = await resolveOrderId(event);
+  const eventId = event.id;
+  const eventType = event.type;
+  const payment = event.payload;
+  const orderId = payment.metadata?.orderId || (await resolveOrderId(event));
   if (!orderId) {
-    log.error("yoco.webhook.no_order_match_failed", { eventId: event.id });
+    log.error("yoco.webhook.no_order_match_failed", { eventId });
     return;
   }
 
-  const checkoutId = event.payload.checkoutId || null;
-  const paymentId = event.payload.id || null;
-
-  let transactionId: string | null = null;
-  if (checkoutId) {
-    const { data: tx } = await db
-      .from("payment_transactions")
-      .select("id")
-      .eq("order_id", orderId)
-      .eq("provider_checkout_id", checkoutId)
-      .maybeSingle();
-    transactionId = tx?.id || null;
-  }
+  const checkoutId = payment.metadata?.checkoutId || payment.checkoutId || null;
+  const paymentId = payment.id || null;
 
   const txPayload = {
     order_id: orderId,
     provider: "yoco",
     provider_checkout_id: checkoutId,
     provider_payment_id: paymentId,
-    provider_event_id: event.id,
+    provider_event_id: eventId,
     provider_status: "failed",
-    amount_cents: event.payload.amount ?? 0,
-    currency: event.payload.currency ?? "ZAR",
-    processing_mode: event.payload.mode || processingMode(),
-    raw_metadata_json: event.payload as unknown as Record<string, unknown>,
-    failed_at: new Date().toISOString(),
+    amount_cents: payment.amount ?? 0,
+    currency: payment.currency ?? "ZAR",
+    processing_mode: payment.mode || processingMode(),
+    raw_metadata_json: {
+      eventId,
+      eventType,
+      payment,
+    },
+    failed_at: eventTimestamp(event),
   };
 
-  if (transactionId) {
-    await db.from("payment_transactions").update(txPayload).eq("id", transactionId);
-  } else {
-    await db.from("payment_transactions").insert(txPayload);
+  const { data: updatedTx, error: updateErr } = await db
+    .from("payment_transactions")
+    .update(txPayload)
+    .eq("provider", "yoco")
+    .eq("order_id", orderId)
+    .eq("provider_checkout_id", checkoutId)
+    .select("id")
+    .maybeSingle();
+
+  if (updateErr) {
+    log.error("yoco.webhook.failed_transaction_update_failed", {
+      orderId,
+      checkoutId,
+      eventId,
+      err: updateErr.message,
+    });
+  }
+
+  if (!updatedTx) {
+    const { error: insertErr } = await db.from("payment_transactions").insert(txPayload);
+    if (insertErr) {
+      log.error("yoco.webhook.failed_transaction_insert_failed", {
+        orderId,
+        checkoutId,
+        eventId,
+        err: insertErr.message,
+      });
+    }
   }
 
   // Don't regress a succeeded order into payment_failed.
@@ -481,9 +524,8 @@ async function processPaymentFailed(event: YocoWebhookEvent) {
     await db.from("orders").update({ status: "payment_failed" }).eq("id", orderId);
   }
 
-  log.info("yoco.webhook.failed", { orderId, eventId: event.id, paymentId });
+  log.info("yoco.webhook.failed", { orderId, eventId, paymentId });
 }
-
 async function resolveOrderId(event: YocoWebhookEvent): Promise<string | null> {
   const metadataOrderId = event.payload.metadata?.orderId;
   if (metadataOrderId) return metadataOrderId;
