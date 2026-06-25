@@ -10,11 +10,11 @@ export type Product = {
   sizes: string[];
   stock_count: number;
   is_active: boolean;
-  compare_at_price_cents?: number | null;
-  sale_price_cents?: number | null;
-  discount_percent_bps?: number | null;
-  sale_starts_at?: string | null;
-  sale_ends_at?: string | null;
+  compare_at_price_cents: number | null;
+  sale_price_cents: number | null;
+  discount_percent_bps: number | null;
+  sale_starts_at: string | null;
+  sale_ends_at: string | null;
 };
 
 export type OrderStatus =
@@ -99,7 +99,7 @@ export type ActiveSale = {
 };
 
 export function getActiveSale(product: Product, now = new Date()): ActiveSale | null {
-  if (product.sale_price_cents === null || product.sale_price_cents === undefined || product.sale_price_cents <= 0) {
+  if (product.sale_price_cents == null || product.sale_price_cents <= 0) {
     return null;
   }
 
