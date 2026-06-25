@@ -220,12 +220,11 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
   const isDisplayImage = hasDisplayImage && currentImage === 0;
   const soldOut = product.stock_count <= 0;
   const activeSale = getActiveSale(product);
-  const priceDisplay = formatZAR(getEffectiveDisplayPriceCents(product));
-  const wasPriceDisplay = activeSale ? formatZAR(activeSale.compareAtPriceCents) : null;
+  const priceDisplay = formatZarFromCents(getEffectiveDisplayPriceCents(product));
+  const wasPriceDisplay = activeSale ? formatZarFromCents(activeSale.compareAtPriceCents) : null;
   const discountPercentDisplay = activeSale?.discountPercent == null
     ? null
     : `${Number.isInteger(activeSale.discountPercent) ? activeSale.discountPercent : activeSale.discountPercent.toFixed(2)}% off`;
-  const priceDisplay = formatZarFromCents(product.price_cents);
 
   useEffect(() => {
     if (isDisplayImage) {
@@ -588,7 +587,7 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
     }
   };
 
-  const priceDisplay = formatZAR(getEffectiveDisplayPriceCents(product));
+  const priceDisplay = formatZarFromCents(getEffectiveDisplayPriceCents(product));
   const primaryImage = product.images[0] ?? product.image_url ?? '';
 
   return (
