@@ -5,7 +5,7 @@ import emailjs from '@emailjs/browser';
 import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
 import { useProducts } from './hooks/useProducts';
-import { createOrder, createYocoCheckout, formatZAR, getActiveSale, getEffectiveDisplayPriceCents, Product } from './lib/api';
+import { createOrder, createYocoCheckout, formatZarFromCents, getActiveSale, getEffectiveDisplayPriceCents, Product } from './lib/api';
 import { PrivacyPolicyModal, TermsOfServiceModal } from './LegalPages';
 
 const PROMO_VIDEO = '/media/promovid.MP4';
@@ -225,6 +225,7 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
   const discountPercentDisplay = activeSale?.discountPercent == null
     ? null
     : `${Number.isInteger(activeSale.discountPercent) ? activeSale.discountPercent : activeSale.discountPercent.toFixed(2)}% off`;
+  const priceDisplay = formatZarFromCents(product.price_cents);
 
   useEffect(() => {
     if (isDisplayImage) {

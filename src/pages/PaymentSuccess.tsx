@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Check, Loader2 } from "lucide-react";
-import { fetchOrder, formatZAR, Order, OrderItem } from "../lib/api";
+import { fetchOrder, formatZarFromCents, Order, OrderItem } from "../lib/api";
 
 const TERMINAL_STATES = new Set(["paid", "payment_failed", "cancelled", "refunded"]);
 
@@ -79,7 +79,7 @@ export default function PaymentSuccess() {
               </div>
               <div className="flex justify-between text-gray-400 text-sm">
                 <span>Total</span>
-                <span className="text-white font-bold">{formatZAR(order.amount_cents)}</span>
+                <span className="text-white font-bold">{formatZarFromCents(order.amount_cents)}</span>
               </div>
             </div>
           )}
@@ -93,7 +93,7 @@ export default function PaymentSuccess() {
                     {it.size ? ` · ${it.size}` : ""} × {it.quantity}
                   </span>
                   <span className="text-gray-400">
-                    {formatZAR(it.unit_price_cents * it.quantity)}
+                    {formatZarFromCents(it.unit_price_cents * it.quantity)}
                   </span>
                 </div>
               ))}

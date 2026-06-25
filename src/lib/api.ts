@@ -91,12 +91,6 @@ export async function fetchOrder(id: string): Promise<{ order: Order; items: Ord
   return asJson<{ order: Order; items: OrderItem[] }>(res);
 }
 
-export function formatZAR(cents: number): string {
-  const amount = (cents / 100).toFixed(2);
-  const [rands, centsPart] = amount.split(".");
-  return `R${rands.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${centsPart}`;
-}
-
 export type ActiveSale = {
   isActive: true;
   compareAtPriceCents: number;
@@ -126,4 +120,6 @@ export function getActiveSale(product: Product, now = new Date()): ActiveSale | 
 
 export function getEffectiveDisplayPriceCents(product: Product, now = new Date()): number {
   return getActiveSale(product, now)?.salePriceCents ?? product.price_cents;
+export function formatZarFromCents(cents: number): string {
+  return new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(cents / 100);
 }
