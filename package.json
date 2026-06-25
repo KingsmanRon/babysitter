@@ -8,7 +8,8 @@
     "dev:vercel": "vercel dev",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "test:yoco": "rm -rf .tmp/yoco-test && tsc -p tsconfig.test.json && node --test .tmp/yoco-test/test/yoco.test.js"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
