@@ -43,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data: products } = await db
       .from("products")
-      .select("id, slug, name, stock_count, price_cents, currency, is_active")
+      .select("id, slug, name, stock_count, price_cents, currency, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at")
       .order("created_at", { ascending: true });
 
     res.setHeader("Cache-Control", "no-store");

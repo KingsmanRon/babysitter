@@ -2,6 +2,14 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { formatZarFromCents } from "../lib/api";
 
+type ProductSaleDraft = {
+  compare_at_price_cents: string;
+  sale_price_cents: string;
+  discount_percent_bps: string;
+  sale_starts_at: string;
+  sale_ends_at: string;
+};
+
 type AdminSummary = {
   orders: Array<{
     id: string;
@@ -35,13 +43,52 @@ type AdminSummary = {
     price_cents: number;
     currency: string;
     is_active: boolean;
+    compare_at_price_cents: number | null;
+    sale_price_cents: number | null;
+    discount_percent_bps: number | null;
+    sale_starts_at: string | null;
+    sale_ends_at: string | null;
   }>;
 };
+
+type AdminProduct = AdminSummary["products"][number];
+
+const saleDraftFromProduct = (product: AdminProduct): ProductSaleDraft => ({
+  compare_at_price_cents: product.compare_at_price_cents?.toString() ?? "",
+  sale_price_cents: product.sale_price_cents?.toString() ?? "",
+  discount_percent_bps: product.discount_percent_bps?.toString() ?? "",
+  sale_starts_at: toDatetimeLocal(product.sale_starts_at),
+  sale_ends_at: toDatetimeLocal(product.sale_ends_at),
+});
+
+function toDatetimeLocal(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function fromDatetimeLocal(value: string): string | null {
+  if (!value.trim()) return null;
+  return new Date(value).toISOString();
+}
+
+function parseNullableInteger(value: string, field: string, max?: number): number | null {
+  if (!value.trim()) return null;
+  if (!/^\d+$/.test(value.trim())) throw new Error(`${field} must be a non-negative integer`);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) throw new Error(`${field} is too large`);
+  if (max !== undefined && parsed > max) throw new Error(`${field} must be between 0 and ${max}`);
+  return parsed;
+}
 
 export default function Admin() {
   const envToken = (import.meta.env.VITE_ADMIN_TOKEN as string | undefined) || "";
   const [token, setToken] = useState(() => sessionStorage.getItem("admin_token") || envToken);
   const [data, setData] = useState<AdminSummary | null>(null);
+  const [saleDrafts, setSaleDrafts] = useState<Record<string, ProductSaleDraft>>({});
+  const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,11 +106,64 @@ export default function Admin() {
       }
       const json = (await res.json()) as AdminSummary;
       setData(json);
+      setSaleDrafts(Object.fromEntries(json.products.map((p) => [p.id, saleDraftFromProduct(p)])));
       sessionStorage.setItem("admin_token", t);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateSaleDraft = (productId: string, field: keyof ProductSaleDraft, value: string) => {
+    setSaleDrafts((drafts) => ({
+      ...drafts,
+      [productId]: {
+        ...drafts[productId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const saveSaleFields = async (productId: string) => {
+    const draft = saleDrafts[productId];
+    if (!draft) return;
+
+    setSavingProductId(productId);
+    setError(null);
+    try {
+      const body = {
+        compare_at_price_cents: parseNullableInteger(
+          draft.compare_at_price_cents,
+          "Compare-at price cents",
+        ),
+        sale_price_cents: parseNullableInteger(draft.sale_price_cents, "Sale price cents"),
+        discount_percent_bps: parseNullableInteger(
+          draft.discount_percent_bps,
+          "Discount basis points",
+          10000,
+        ),
+        sale_starts_at: fromDatetimeLocal(draft.sale_starts_at),
+        sale_ends_at: fromDatetimeLocal(draft.sale_ends_at),
+      };
+
+      const res = await fetch(`/api/admin/products/${encodeURIComponent(productId)}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-token": token,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const responseBody = await res.json().catch(() => ({}));
+        throw new Error(responseBody.error || `HTTP ${res.status}`);
+      }
+      await load(token);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSavingProductId(null);
     }
   };
 
@@ -118,18 +218,93 @@ export default function Admin() {
                       <th className="text-right p-3">Price</th>
                       <th className="text-right p-3">Stock</th>
                       <th className="text-right p-3">Active</th>
+                      <th className="text-left p-3">Sale price</th>
+                      <th className="text-left p-3">Compare at</th>
+                      <th className="text-left p-3">Discount bps</th>
+                      <th className="text-left p-3">Sale start</th>
+                      <th className="text-left p-3">Sale end</th>
+                      <th className="text-right p-3">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.products.map((p) => (
-                      <tr key={p.id} className="border-t border-gray-800">
-                        <td className="p-3">{p.name}</td>
-                        <td className="p-3 font-mono text-xs text-gray-400">{p.slug}</td>
-                        <td className="p-3 text-right">{formatZarFromCents(p.price_cents)}</td>
-                        <td className="p-3 text-right font-semibold">{p.stock_count}</td>
-                        <td className="p-3 text-right">{p.is_active ? "yes" : "no"}</td>
-                      </tr>
-                    ))}
+                    {data.products.map((p) => {
+                      const draft = saleDrafts[p.id] || saleDraftFromProduct(p);
+                      const inputClass =
+                        "w-32 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500";
+                      return (
+                        <tr key={p.id} className="border-t border-gray-800">
+                          <td className="p-3">{p.name}</td>
+                          <td className="p-3 font-mono text-xs text-gray-400">{p.slug}</td>
+                          <td className="p-3 text-right">{formatZarFromCents(p.price_cents)}</td>
+                          <td className="p-3 text-right font-semibold">{p.stock_count}</td>
+                          <td className="p-3 text-right">{p.is_active ? "yes" : "no"}</td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={draft.sale_price_cents}
+                              onChange={(e) => updateSaleDraft(p.id, "sale_price_cents", e.target.value)}
+                              className={inputClass}
+                              placeholder="cents"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={draft.compare_at_price_cents}
+                              onChange={(e) =>
+                                updateSaleDraft(p.id, "compare_at_price_cents", e.target.value)
+                              }
+                              className={inputClass}
+                              placeholder="cents"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              min="0"
+                              max="10000"
+                              step="1"
+                              value={draft.discount_percent_bps}
+                              onChange={(e) =>
+                                updateSaleDraft(p.id, "discount_percent_bps", e.target.value)
+                              }
+                              className={inputClass}
+                              placeholder="0-10000"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="datetime-local"
+                              value={draft.sale_starts_at}
+                              onChange={(e) => updateSaleDraft(p.id, "sale_starts_at", e.target.value)}
+                              className="w-44 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="datetime-local"
+                              value={draft.sale_ends_at}
+                              onChange={(e) => updateSaleDraft(p.id, "sale_ends_at", e.target.value)}
+                              className="w-44 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500"
+                            />
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => saveSaleFields(p.id)}
+                              disabled={savingProductId === p.id}
+                              className="px-3 py-1 bg-purple-600 rounded font-semibold disabled:opacity-50"
+                            >
+                              {savingProductId === p.id ? "Saving..." : "Save"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
