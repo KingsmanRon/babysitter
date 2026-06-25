@@ -126,6 +126,3 @@ export function formatZARFromCents(cents: number): string {
   return new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(cents / 100);
 }
 
-export function formatZAR(cents: number): string {
-  return formatZARFromCents(cents);
-}

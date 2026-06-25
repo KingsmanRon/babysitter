@@ -5,7 +5,7 @@ import emailjs from '@emailjs/browser';
 import { useInView } from 'react-intersection-observer';
 import { cn } from './utils/cn';
 import { useProducts } from './hooks/useProducts';
-import { createOrder, createYocoCheckout, formatZAR, Product } from './lib/api';
+import { createOrder, createYocoCheckout, formatZARFromCents, Product } from './lib/api';
 import { PrivacyPolicyModal, TermsOfServiceModal } from './LegalPages';
 
 const PROMO_VIDEO = '/media/promovid.MP4';
@@ -219,7 +219,7 @@ const ProductSection = ({ product, selectedSize, setSelectedSize, onAddToCart }:
   const hasDisplayImage = images.length > 1;
   const isDisplayImage = hasDisplayImage && currentImage === 0;
   const soldOut = product.stock_count <= 0;
-  const priceDisplay = formatZAR(product.price_cents);
+  const priceDisplay = formatZARFromCents(product.price_cents);
 
   useEffect(() => {
     if (isDisplayImage) {
@@ -565,7 +565,7 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
     }
   };
 
-  const priceDisplay = formatZAR(product.price_cents);
+  const priceDisplay = formatZARFromCents(product.price_cents);
   const primaryImage = product.images[0] ?? product.image_url ?? '';
 
   return (
