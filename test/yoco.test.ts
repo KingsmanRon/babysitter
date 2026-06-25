@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { mock } from "node:test";
 import assert from "node:assert/strict";
 import { handleYocoWebhook, type YocoWebhookEvent } from "../lib/yoco.js";
 import { setSupabaseAdminForTests } from "../lib/supabaseAdmin.js";
@@ -52,6 +52,10 @@ class QueryBuilder {
   }
 
   maybeSingle() {
+    return this.execute(true);
+  }
+
+  single() {
     return this.execute(true);
   }
 
@@ -117,10 +121,26 @@ function createFakeSupabase(state: DbState) {
   };
 }
 
-function paymentSucceededEvent(id: string): YocoWebhookEvent {
+function paymentSucceededEvent(id: string, createdDate?: string): YocoWebhookEvent {
   return {
     id,
     type: "payment.succeeded",
+    ...(createdDate === undefined ? {} : { createdDate }),
+    payload: {
+      id: `payment-${id}`,
+      amount: 1000,
+      currency: "ZAR",
+      checkoutId: "checkout-1",
+      metadata: { orderId: "order-1" },
+    },
+  };
+}
+
+function paymentFailedEvent(id: string, createdDate?: string): YocoWebhookEvent {
+  return {
+    id,
+    type: "payment.failed",
+    ...(createdDate === undefined ? {} : { createdDate }),
     payload: {
       id: `payment-${id}`,
       amount: 1000,
@@ -135,7 +155,7 @@ test("duplicate payment.succeeded events decrement stock only for the paid trans
   const state: DbState = {
     orders: [{ id: "order-1", status: "pending_payment" }],
     order_items: [{ order_id: "order-1", product_id: "product-1", quantity: 2 }],
-    payment_transactions: [{ id: "tx-1", order_id: "order-1", provider_checkout_id: "checkout-1" }],
+    payment_transactions: [{ id: "tx-1", order_id: "order-1", provider_checkout_id: "checkout-1", provider: "yoco" }],
     payment_webhook_events: [],
     decrementCalls: [],
   };
@@ -150,4 +170,71 @@ test("duplicate payment.succeeded events decrement stock only for the paid trans
 
   assert.equal(state.orders[0].status, "paid");
   assert.deepEqual(state.decrementCalls, [{ productId: "product-1", quantity: 2 }]);
+});
+
+test("payment.succeeded stores paid_at from event.createdDate", async () => {
+  const createdDate = "2026-06-24T10:11:12.000Z";
+  const state: DbState = {
+    orders: [{ id: "order-1", status: "pending_payment" }],
+    order_items: [],
+    payment_transactions: [{ id: "tx-1", order_id: "order-1", provider_checkout_id: "checkout-1", provider: "yoco" }],
+    payment_webhook_events: [],
+    decrementCalls: [],
+  };
+  setSupabaseAdminForTests(createFakeSupabase(state) as never);
+
+  try {
+    await handleYocoWebhook(paymentSucceededEvent("event-1", createdDate), {}, true);
+  } finally {
+    setSupabaseAdminForTests(null);
+  }
+
+  assert.equal(state.payment_transactions[0].paid_at, createdDate);
+});
+
+test("payment.failed stores failed_at from event.createdDate", async () => {
+  const createdDate = "2026-06-24T11:12:13.000Z";
+  const state: DbState = {
+    orders: [{ id: "order-1", status: "pending_payment" }],
+    order_items: [],
+    payment_transactions: [{ id: "tx-1", order_id: "order-1", provider_checkout_id: "checkout-1", provider: "yoco" }],
+    payment_webhook_events: [],
+    decrementCalls: [],
+  };
+  setSupabaseAdminForTests(createFakeSupabase(state) as never);
+
+  try {
+    await handleYocoWebhook(paymentFailedEvent("event-1", createdDate), {}, true);
+  } finally {
+    setSupabaseAdminForTests(null);
+  }
+
+  assert.equal(state.payment_transactions[0].failed_at, createdDate);
+});
+
+test("missing or invalid createdDate falls back to the current timestamp without throwing", async () => {
+  const now = new Date("2026-06-25T12:13:14.000Z");
+  mock.timers.enable({ apis: ["Date"], now });
+
+  try {
+    for (const [event, expectedField] of [
+      [paymentSucceededEvent("missing-created-date"), "paid_at"],
+      [paymentFailedEvent("invalid-created-date", "not-a-date"), "failed_at"],
+    ] as const) {
+      const state: DbState = {
+        orders: [{ id: "order-1", status: "pending_payment" }],
+        order_items: [],
+        payment_transactions: [{ id: "tx-1", order_id: "order-1", provider_checkout_id: "checkout-1", provider: "yoco" }],
+        payment_webhook_events: [],
+        decrementCalls: [],
+      };
+      setSupabaseAdminForTests(createFakeSupabase(state) as never);
+
+      await assert.doesNotReject(handleYocoWebhook(event, {}, true));
+      assert.equal(state.payment_transactions[0][expectedField], now.toISOString());
+    }
+  } finally {
+    setSupabaseAdminForTests(null);
+    mock.timers.reset();
+  }
 });
