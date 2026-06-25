@@ -89,3 +89,7 @@ export async function fetchOrder(id: string): Promise<{ order: Order; items: Ord
 export function formatZAR(cents: number): string {
   return `R${(cents / 100).toFixed(2)}`;
 }
+
+export function formatZARFromCents(cents: number): string {
+  return formatZAR(cents);
+}

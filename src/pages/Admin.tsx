@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { formatZAR } from "../lib/api";
+import { formatZAR, formatZARFromCents } from "../lib/api";
 
 type AdminSummary = {
   orders: Array<{
@@ -296,7 +296,7 @@ export default function Admin() {
                       <tr key={p.id} className="border-t border-gray-800">
                         <td className="p-3">{p.name}</td>
                         <td className="p-3 font-mono text-xs text-gray-400">{p.slug}</td>
-                        <td className="p-3 text-right">{formatZAR(p.price_cents)}</td>
+                        <td className="p-3 text-right">{formatZARFromCents(p.price_cents)}</td>
                         <td className="p-3">
                           {p.sale_price_cents !== null ? (
                             <div>
