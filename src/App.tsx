@@ -527,7 +527,17 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ email: "", name: "" });
+  const [formData, setFormData] = useState({
+    email: "",
+    name: "",
+    phone: "",
+    line1: "",
+    line2: "",
+    suburb: "",
+    city: "",
+    province: "",
+    postalCode: "",
+  });
   const [consent, setConsent] = useState({ terms: false, marketing: false });
   const modalRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
@@ -577,6 +587,15 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
       const order = await createOrder({
         customerEmail: formData.email,
         customerName: formData.name,
+        shipping: {
+          phone: formData.phone,
+          line1: formData.line1,
+          line2: formData.line2,
+          suburb: formData.suburb,
+          city: formData.city,
+          province: formData.province,
+          postalCode: formData.postalCode,
+        },
         items: [{ productId: product.id, size, quantity: 1 }],
       });
       const { redirectUrl } = await createYocoCheckout(order.id);
@@ -589,6 +608,10 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
 
   const priceDisplay = formatZarFromCents(getEffectiveDisplayPriceCents(product));
   const primaryImage = product.images[0] ?? product.image_url ?? '';
+  const fieldClass = cn(
+    "w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none transition-colors",
+    s ? "focus:border-white" : "focus:border-purple-500"
+  );
 
   return (
     <motion.div
@@ -703,6 +726,99 @@ const CheckoutModal = ({ product, size, onClose }: CheckoutModalProps) => {
                   )}
                   placeholder="John Doe"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Phone Number</label>
+                <input
+                  type="tel"
+                  required
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className={fieldClass}
+                  placeholder="071 234 5678"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Street Address</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.line1}
+                  onChange={(e) => setFormData({ ...formData, line1: e.target.value })}
+                  className={fieldClass}
+                  placeholder="123 Main Road"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">
+                  Apartment, suite, etc. <span className="text-gray-600">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.line2}
+                  onChange={(e) => setFormData({ ...formData, line2: e.target.value })}
+                  className={fieldClass}
+                  placeholder="Unit 4B, complex name"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Suburb</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.suburb}
+                    onChange={(e) => setFormData({ ...formData, suburb: e.target.value })}
+                    className={fieldClass}
+                    placeholder="Suburb"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">City / Town</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className={fieldClass}
+                    placeholder="City"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Province</label>
+                  <select
+                    required
+                    value={formData.province}
+                    onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                    className={fieldClass}
+                  >
+                    <option value="" disabled>Select province</option>
+                    <option>Eastern Cape</option>
+                    <option>Free State</option>
+                    <option>Gauteng</option>
+                    <option>KwaZulu-Natal</option>
+                    <option>Limpopo</option>
+                    <option>Mpumalanga</option>
+                    <option>North West</option>
+                    <option>Northern Cape</option>
+                    <option>Western Cape</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Postal Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    value={formData.postalCode}
+                    onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
+                    className={fieldClass}
+                    placeholder="0001"
+                  />
+                </div>
               </div>
 
               <div className="space-y-3 pt-2">

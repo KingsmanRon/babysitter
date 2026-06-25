@@ -3,9 +3,19 @@ import { supabaseAdmin } from "../../lib/supabaseAdmin.js";
 import { log } from "../../lib/logger.js";
 
 type ItemInput = { productId: string; size?: string; quantity: number };
+type ShippingInput = {
+  phone?: string;
+  line1?: string;
+  line2?: string;
+  suburb?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+};
 type CreateOrderBody = {
   customerEmail?: string;
   customerName?: string;
+  shipping?: ShippingInput;
   items: ItemInput[];
 };
 
@@ -80,6 +90,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  const ship = body.shipping ?? {};
+  const shipping = {
+    phone: (ship.phone ?? "").trim(),
+    line1: (ship.line1 ?? "").trim(),
+    line2: (ship.line2 ?? "").trim(),
+    suburb: (ship.suburb ?? "").trim(),
+    city: (ship.city ?? "").trim(),
+    province: (ship.province ?? "").trim(),
+    postalCode: (ship.postalCode ?? "").trim(),
+  };
+  const missingShip = (
+    [
+      ["phone number", shipping.phone],
+      ["street address", shipping.line1],
+      ["suburb", shipping.suburb],
+      ["city", shipping.city],
+      ["province", shipping.province],
+      ["postal code", shipping.postalCode],
+    ] as const
+  ).find(([, value]) => !value);
+  if (missingShip) {
+    return res.status(400).json({ error: `Delivery ${missingShip[0]} is required` });
+  }
+
   try {
     const db = supabaseAdmin();
 
@@ -141,6 +175,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         order_number: orderNumber,
         customer_email: body.customerEmail ?? null,
         customer_name: body.customerName ?? null,
+        ship_phone: shipping.phone,
+        ship_line1: shipping.line1,
+        ship_line2: shipping.line2 || null,
+        ship_suburb: shipping.suburb,
+        ship_city: shipping.city,
+        ship_province: shipping.province,
+        ship_postal_code: shipping.postalCode,
         currency,
         amount_cents: totalCents,
         status: "draft",
