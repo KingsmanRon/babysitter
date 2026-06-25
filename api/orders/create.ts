@@ -14,6 +14,56 @@ function generateOrderNumber(): string {
   return `BS-${rnd}`;
 }
 
+type ProductRow = {
+  id: string;
+  name: string;
+  price_cents: number;
+  currency: string;
+  stock_count: number;
+  is_active: boolean;
+  compare_at_price_cents: number | null;
+  sale_price_cents: number | null;
+  discount_percent_bps: number | null;
+  sale_starts_at: string | null;
+  sale_ends_at: string | null;
+};
+
+function calculatePricingSnapshot(product: ProductRow, now = new Date()) {
+  const saleStartsAt = product.sale_starts_at ? new Date(product.sale_starts_at) : null;
+  const saleEndsAt = product.sale_ends_at ? new Date(product.sale_ends_at) : null;
+  const saleIsActive =
+    product.sale_price_cents !== null &&
+    product.sale_price_cents < product.price_cents &&
+    (!saleStartsAt || saleStartsAt <= now) &&
+    (!saleEndsAt || saleEndsAt >= now);
+
+  const effectiveUnitPriceCents = saleIsActive ? product.sale_price_cents! : product.price_cents;
+  const listUnitPriceCents = product.compare_at_price_cents ?? product.price_cents;
+  const discountCents = Math.max(0, listUnitPriceCents - effectiveUnitPriceCents);
+  const discountPercentBps =
+    listUnitPriceCents > 0 ? Math.round((discountCents / listUnitPriceCents) * 10000) : null;
+
+  return {
+    effectiveUnitPriceCents,
+    listUnitPriceCents,
+    discountCents,
+    discountPercentBps,
+    pricingSnapshot: {
+      product_price_cents: product.price_cents,
+      compare_at_price_cents: product.compare_at_price_cents,
+      sale_price_cents: product.sale_price_cents,
+      product_discount_percent_bps: product.discount_percent_bps,
+      sale_starts_at: product.sale_starts_at,
+      sale_ends_at: product.sale_ends_at,
+      sale_is_active: saleIsActive,
+      effective_unit_price_cents: effectiveUnitPriceCents,
+      list_unit_price_cents: listUnitPriceCents,
+      discount_cents: discountCents,
+      discount_percent_bps: discountPercentBps,
+    },
+  };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -36,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const productIds = body.items.map((i) => i.productId);
     const { data: products, error: productsErr } = await db
       .from("products")
-      .select("id, name, price_cents, currency, stock_count, is_active")
+      .select("id, name, price_cents, currency, stock_count, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at")
       .in("id", productIds);
     if (productsErr) throw productsErr;
 
@@ -50,8 +100,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       size: string | null;
       quantity: number;
       unit_price_cents: number;
+      list_unit_price_cents: number;
+      discount_cents: number;
+      discount_percent_bps: number | null;
+      pricing_snapshot: Record<string, unknown>;
     }> = [];
 
+    const now = new Date();
     for (const item of body.items) {
       const product = productMap.get(item.productId);
       if (!product || !product.is_active) {
@@ -62,14 +117,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .status(409)
           .json({ error: `Insufficient stock for ${product.name}`, productId: product.id });
       }
-      totalCents += product.price_cents * item.quantity;
+      const pricing = calculatePricingSnapshot(product, now);
+
+      totalCents += pricing.effectiveUnitPriceCents * item.quantity;
       currency = product.currency;
       itemRows.push({
         product_id: product.id,
         product_name: product.name,
         size: item.size ?? null,
         quantity: item.quantity,
-        unit_price_cents: product.price_cents,
+        unit_price_cents: pricing.effectiveUnitPriceCents,
+        list_unit_price_cents: pricing.listUnitPriceCents,
+        discount_cents: pricing.discountCents,
+        discount_percent_bps: pricing.discountPercentBps,
+        pricing_snapshot: pricing.pricingSnapshot,
       });
     }
 
