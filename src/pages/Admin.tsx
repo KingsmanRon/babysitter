@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { formatZAR, formatZARFromCents } from "../lib/api";
+import { formatZARFromCents } from "../lib/api";
 
 type AdminSummary = {
   orders: Array<{
@@ -169,7 +169,7 @@ function SaleEditor({
         </div>
 
         <div className="rounded-lg bg-gray-900 p-3 text-sm text-gray-300">
-          Normal: {formatZAR(product.price_cents)} · Preview: {preview !== null ? formatZAR(preview) : "—"}
+          Normal: {formatZARFromCents(product.price_cents)} · Preview: {preview !== null ? formatZARFromCents(preview) : "—"}
         </div>
 
         <div className="flex justify-end gap-2">
@@ -312,9 +312,9 @@ export default function Admin() {
                         <td className="p-3 text-right">
                           {p.sale_price_cents !== null ? (
                             <div>
-                              <span className="font-semibold text-green-300">{formatZAR(p.sale_price_cents)}</span>
+                              <span className="font-semibold text-green-300">{formatZARFromCents(p.sale_price_cents)}</span>
                               <div className="text-xs text-gray-500 line-through">
-                                {formatZAR(p.compare_at_price_cents ?? p.price_cents)}
+                                {formatZARFromCents(p.compare_at_price_cents ?? p.price_cents)}
                               </div>
                             </div>
                           ) : (
@@ -369,7 +369,7 @@ export default function Admin() {
                             {o.status}
                           </span>
                         </td>
-                        <td className="p-3 text-right">{formatZAR(o.amount_cents)}</td>
+                        <td className="p-3 text-right">{formatZARFromCents(o.amount_cents)}</td>
                         <td className="p-3">
                           <div>{o.customer_name || "—"}</div>
                           <div className="text-xs text-gray-500">{o.customer_email || "—"}</div>
@@ -409,7 +409,7 @@ export default function Admin() {
                           {t.provider_payment_id || "—"}
                         </td>
                         <td className="p-3">{t.provider_status || "—"}</td>
-                        <td className="p-3 text-right">{formatZAR(t.amount_cents)}</td>
+                        <td className="p-3 text-right">{formatZARFromCents(t.amount_cents)}</td>
                         <td className="p-3">
                           {t.payment_method_brand
                             ? `${t.payment_method_brand}${t.payment_method_last4 ? ` ···${t.payment_method_last4}` : ""}`

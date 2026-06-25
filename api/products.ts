@@ -13,7 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data, error } = await db
       .from("products")
       .select(
-        "id, slug, name, description, price_cents, currency, image_url, images, sizes, stock_count, is_active",
+        "id, slug, name, description, price_cents, currency, image_url, images, sizes, stock_count, is_active, compare_at_price_cents, discount_percent_bps, sale_price_cents, sale_starts_at, sale_ends_at",
       )
       .eq("is_active", true)
       .order("created_at", { ascending: true });

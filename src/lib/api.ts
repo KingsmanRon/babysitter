@@ -10,6 +10,11 @@ export type Product = {
   sizes: string[];
   stock_count: number;
   is_active: boolean;
+  compare_at_price_cents?: number | null;
+  sale_price_cents?: number | null;
+  discount_percent_bps?: number | null;
+  sale_starts_at?: string | null;
+  sale_ends_at?: string | null;
 };
 
 export type OrderStatus =
@@ -86,10 +91,41 @@ export async function fetchOrder(id: string): Promise<{ order: Order; items: Ord
   return asJson<{ order: Order; items: OrderItem[] }>(res);
 }
 
-export function formatZAR(cents: number): string {
-  return `R${(cents / 100).toFixed(2)}`;
+export type ActiveSale = {
+  isActive: true;
+  compareAtPriceCents: number;
+  salePriceCents: number;
+  discountPercent: number | null;
+};
+
+export function getActiveSale(product: Product, now = new Date()): ActiveSale | null {
+  if (product.sale_price_cents === null || product.sale_price_cents === undefined || product.sale_price_cents <= 0) {
+    return null;
+  }
+
+  const startsAt = product.sale_starts_at ? new Date(product.sale_starts_at) : null;
+  const endsAt = product.sale_ends_at ? new Date(product.sale_ends_at) : null;
+
+  if ((startsAt && startsAt > now) || (endsAt && endsAt < now)) {
+    return null;
+  }
+
+  return {
+    isActive: true,
+    compareAtPriceCents: product.compare_at_price_cents ?? product.price_cents,
+    salePriceCents: product.sale_price_cents,
+    discountPercent: product.discount_percent_bps == null ? null : product.discount_percent_bps / 100,
+  };
+}
+
+export function getEffectiveDisplayPriceCents(product: Product, now = new Date()): number {
+  return getActiveSale(product, now)?.salePriceCents ?? product.price_cents;
 }
 
 export function formatZARFromCents(cents: number): string {
-  return formatZAR(cents);
+  return new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(cents / 100);
+}
+
+export function formatZAR(cents: number): string {
+  return formatZARFromCents(cents);
 }
