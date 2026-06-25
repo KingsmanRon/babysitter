@@ -386,25 +386,22 @@ async function processPaymentSucceeded(event: YocoWebhookEvent) {
     }
   }
 
-  // Only fulfil once: guard by current status.
-  const { data: orderBefore } = await db
-    .from("orders")
-    .select("id, status")
-    .eq("id", orderId)
-    .single();
-
-  if (orderBefore && orderBefore.status === "paid") {
-    log.info("yoco.webhook.already_paid", { orderId, eventId: event.id });
-    return;
-  }
-
-  const { error: orderErr } = await db
+  // Only fulfil once: atomically transition to paid and only continue when this
+  // invocation performed the transition.
+  const { data: paidOrder, error: orderErr } = await db
     .from("orders")
     .update({ status: "paid" })
     .eq("id", orderId)
-    .neq("status", "paid");
+    .neq("status", "paid")
+    .select("id, status")
+    .maybeSingle();
   if (orderErr) {
     log.error("yoco.webhook.order_update_failed", { orderId, err: orderErr.message });
+    return;
+  }
+
+  if (!paidOrder) {
+    log.info("yoco.webhook.already_paid", { orderId, eventId: event.id });
     return;
   }
 
