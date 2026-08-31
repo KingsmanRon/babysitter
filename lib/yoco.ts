@@ -262,6 +262,11 @@ function header(
   return v;
 }
 
+function eventTimestamp(event: YocoWebhookEvent): string {
+  const timestamp = event.createdDate || new Date().toISOString();
+  return Number.isNaN(Date.parse(timestamp)) ? new Date().toISOString() : timestamp;
+}
+
 // ──────────────────────────────────────────────────────────────
 // handleYocoWebhook — persist + fulfil
 // ──────────────────────────────────────────────────────────────
