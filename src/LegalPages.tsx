@@ -194,7 +194,7 @@ export const TermsOfServiceModal = ({ isOpen, onClose }: LegalModalProps) => (
               <h3 className="text-white font-semibold text-base mb-2">4. Shipping & Delivery</h3>
               <ul className="list-disc list-inside space-y-1 text-gray-400">
                 <li>Any delivery fee is shown at checkout before you pay. Where collection is offered, you can choose it at no fee.</li>
-                <li>Delivery times are estimated at 5–10 business days depending on your location.</li>
+                <li>Delivery times are estimated at 3–5 business days depending on your location.</li>
                 <li>We are not liable for delays caused by the courier service or circumstances beyond our control.</li>
                 <li>Risk of loss passes to the buyer upon delivery to the shipping address provided.</li>
               </ul>

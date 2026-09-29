@@ -68,13 +68,13 @@ const FAQ_SECTIONS: FaqSection[] = [
     id: 'returns',
     label: '02',
     title: 'Returns & Exchanges',
-    note: 'Hassle-free returns within 30 days',
+    note: 'Faulty items, within 7 days',
     symbol: 'bleach',
     items: [
       {
         question: 'What is your return policy?',
         answer:
-          'Items can be returned within 30 days of purchase in their original condition. Please ensure all tags are attached and the item is unworn and unwashed.',
+          'Items that are faulty, damaged or not as described can be returned within 7 days of delivery. Please ensure all tags are attached and the item is unworn and unwashed.',
       },
       {
         question: 'How do I make a return?',
