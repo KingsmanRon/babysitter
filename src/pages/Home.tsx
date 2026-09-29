@@ -17,7 +17,6 @@ const colors = {
   card: '#1a1a1a',
   textPrimary: '#e5e5e5',
   textSecondary: '#a3a3a3',
-  accentGlow: 'rgba(255, 255, 255, 0.06)',
   border: 'rgba(255, 255, 255, 0.08)',
 };
 
@@ -309,7 +308,7 @@ const CatalogButton = ({ className }: { className?: string }) => (
   <Link
     to={CATALOG_PATH}
     className={cn(
-      'group inline-flex items-center gap-3 px-8 py-4 rounded-full bg-white text-black font-archivo font-bold uppercase tracking-wider text-sm transition-transform duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.15)]',
+      'group inline-flex items-center gap-3 px-8 py-4 rounded-full border border-white/25 bg-white/[0.06] backdrop-blur text-white font-archivo font-bold uppercase tracking-wider text-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.12] hover:border-white/50 shadow-[0_0_40px_rgba(255,255,255,0.06)]',
       className,
     )}
   >
@@ -334,14 +333,14 @@ const FaqRow = ({
   onToggle: () => void;
   query: string;
 }) => (
-  <div className="border-t border-dashed border-[#0b0b0b]/25 first:border-t-0">
+  <div className="border-t border-dashed border-white/15 first:border-t-0">
     <h3>
       <button
         id={`${id}-q`}
         aria-expanded={open}
         aria-controls={`${id}-a`}
         onClick={onToggle}
-        className="w-full flex items-center justify-between gap-4 py-4 text-left font-archivo font-bold text-base sm:text-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff3b1f] rounded-sm"
+        className="w-full flex items-center justify-between gap-4 py-4 text-left font-archivo font-bold text-base sm:text-lg text-[#e5e5e5] hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff3b1f] rounded-sm"
       >
         <span><Highlight text={faq.question} query={query} /></span>
         <Plus className={cn('w-5 h-5 shrink-0 transition-transform duration-300', open && 'rotate-45 text-[#ff3b1f]')} />
@@ -354,7 +353,7 @@ const FaqRow = ({
       className={cn('grid transition-[grid-template-rows] duration-300 ease-out', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}
     >
       <div className="overflow-hidden">
-        <p className="pb-5 pr-8 font-archivo text-[15px] leading-relaxed text-[#0b0b0b]/70">
+        <p className="pb-5 pr-8 font-archivo text-[15px] leading-relaxed text-[#a3a3a3]">
           <Highlight text={faq.answer} query={query} />
         </p>
       </div>
@@ -385,19 +384,19 @@ const CareLabel = ({
     viewport={{ once: true, margin: '-60px' }}
     transition={{ duration: 0.5 }}
     className={cn(
-      'relative scroll-mt-24 bg-[#fbf9f4] shadow-[0_18px_40px_-24px_rgba(0,0,0,0.45)] transition-transform duration-300 hover:rotate-0',
+      'relative scroll-mt-24 bg-[#141414] text-[#e5e5e5] ring-1 ring-white/10 shadow-[0_24px_50px_-24px_rgba(0,0,0,0.9)] transition-transform duration-300 hover:rotate-0',
       index % 2 === 0 ? 'rotate-[-0.6deg]' : 'rotate-[0.5deg]',
     )}
   >
     {/* The folded, stitched top of a sewn-in label */}
-    <div className="h-4 bg-[#e7e2d6] border-b border-[#0b0b0b]/10" aria-hidden="true" />
-    <div className="m-2 sm:m-3 border border-dashed border-[#0b0b0b]/30 px-4 sm:px-7 py-5 sm:py-6">
-      <div className="flex items-start justify-between gap-4 pb-4 border-b-2 border-[#0b0b0b]">
+    <div className="h-4 bg-[#1f1f1f] border-b border-white/10" aria-hidden="true" />
+    <div className="m-2 sm:m-3 border border-dashed border-white/20 px-4 sm:px-7 py-5 sm:py-6">
+      <div className="flex items-start justify-between gap-4 pb-4 border-b-2 border-white/70">
         <div>
-          <p className="font-jbmono text-[10px] sm:text-xs uppercase tracking-[0.25em] text-[#0b0b0b]/50">
+          <p className="font-jbmono text-[10px] sm:text-xs uppercase tracking-[0.25em] text-white/40">
             {section.label} — {section.note}
           </p>
-          <h2 className="mt-1 font-anton uppercase text-3xl sm:text-4xl leading-none">{section.title}</h2>
+          <h2 className="mt-1 font-anton uppercase text-3xl sm:text-4xl leading-none text-[#f4f1ea]">{section.title}</h2>
         </div>
         <CareSymbol kind={section.symbol} className="w-9 h-9 sm:w-11 sm:h-11 shrink-0" />
       </div>
@@ -572,19 +571,13 @@ export default function Home() {
         </div>
       </nav>
 
-      <div className="relative z-10 max-w-[760px] mx-auto px-6 pt-28 pb-20">
+      <div className="relative z-10 max-w-[760px] mx-auto px-6 pt-28 pb-24 sm:pb-28">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <span
-            className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-6"
-            style={{ backgroundColor: colors.accentGlow, color: colors.textSecondary }}
-          >
-            Support
-          </span>
           <h1 className="text-4xl sm:text-5xl font-extrabold mb-4" style={{ color: colors.textPrimary }}>
             How can we help?
           </h1>
@@ -636,6 +629,9 @@ export default function Home() {
       </div>
 
       <div className="relative z-10">
+        <div role="separator" className="max-w-7xl mx-auto px-4 sm:px-8">
+          <div className="h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+        </div>
         <Contact />
         <Footer onOpenPrivacy={() => setShowPrivacy(true)} onOpenTerms={() => setShowTerms(true)} />
       </div>
