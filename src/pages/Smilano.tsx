@@ -30,7 +30,7 @@ const PRODUCT_SLUG = 'smilano-tee';
 // Shown until the product row loads; checkout always uses the server price.
 const FALLBACK_PRICE_CENTS = 50000;
 const FALLBACK_DELIVERY_FEE_CENTS = 10000;
-const FALLBACK_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
+const FALLBACK_SIZES = ['S', 'M', 'L', 'XL'];
 
 const SHIRT_IMAGE = '/media/SSML.jpeg';
 const CREW_IMAGE = '/media/4gents.jpeg';
@@ -365,7 +365,7 @@ const Lookbook = ({ reduce }: { reduce: boolean }) => {
           <ul className="font-jbmono text-xs uppercase tracking-[0.2em] divide-y divide-[#0b0b0b]/15 border-y border-[#0b0b0b]/15 max-w-md">
             <li className="flex justify-between py-3"><span>Colour</span><span>Black / cracked white</span></li>
             <li className="flex justify-between py-3"><span>Fit</span><span>Oversized</span></li>
-            <li className="flex justify-between py-3"><span>Sizes</span><span>S — XXL</span></li>
+            <li className="flex justify-between py-3"><span>Sizes</span><span>S — XL</span></li>
           </ul>
         </div>
 
@@ -565,6 +565,16 @@ const CopSection = ({ product, loading, priceCents, deliveryFeeCents, onCheckout
   const available = !!product && product.stock_count > 0;
   const soldOut = !!product && product.stock_count <= 0;
   const totalCents = priceCents + (fulfilment === 'delivery' ? deliveryFeeCents : 0);
+  // Units left in a size, or null when the product only tracks a total.
+  const sizeLeft = (s: string) => (product?.size_stock ? product.size_stock[s] ?? 0 : null);
+  const sizeSoldOut = (s: string) => !available || (sizeLeft(s) ?? 1) <= 0;
+  const selectedLeft = size ? sizeLeft(size) : null;
+  const lowStockCount = selectedLeft ?? product?.stock_count ?? 0;
+
+  // Realtime stock can sell out the chosen size while the page is open.
+  useEffect(() => {
+    if (size && sizeSoldOut(size)) setSize(null);
+  });
 
   const options: Array<{ id: FulfilmentMethod; title: string; note: string; price: string; icon: typeof Truck }> = [
     {
@@ -641,9 +651,9 @@ const CopSection = ({ product, loading, priceCents, deliveryFeeCents, onCheckout
               </h3>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <span className="font-anton text-5xl">{shortZar(priceCents)}</span>
-                {product && !soldOut && product.stock_count <= 5 && (
+                {product && !soldOut && lowStockCount > 0 && lowStockCount <= 5 && (
                   <span className="px-3 py-1 bg-[#ff3b1f]/15 text-[#c62a12] font-jbmono text-xs uppercase tracking-widest">
-                    Only {product.stock_count} left
+                    Only {lowStockCount} left{selectedLeft !== null && size ? ` in ${size}` : ''}
                   </span>
                 )}
               </div>
@@ -654,21 +664,26 @@ const CopSection = ({ product, loading, priceCents, deliveryFeeCents, onCheckout
 
             <fieldset>
               <legend className="font-jbmono text-xs uppercase tracking-[0.25em] mb-3">01 — Size</legend>
-              <div className="grid grid-cols-5 gap-2">
-                {sizes.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setSize(s)}
-                    disabled={!available}
-                    aria-pressed={size === s}
-                    className={cn(
-                      'py-4 font-anton text-xl border-2 border-[#0b0b0b] transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
-                      size === s ? 'bg-[#0b0b0b] text-[#f4f2ee]' : 'hover:bg-[#0b0b0b]/5',
-                    )}
-                  >
-                    {s}
-                  </button>
-                ))}
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${sizes.length}, minmax(0, 1fr))` }}>
+                {sizes.map((s) => {
+                  const out = sizeSoldOut(s);
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => setSize(s)}
+                      disabled={out}
+                      aria-pressed={size === s}
+                      aria-label={out && available ? `${s}, sold out` : s}
+                      className={cn(
+                        'py-4 font-anton text-xl border-2 border-[#0b0b0b] transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                        out && available && 'line-through',
+                        size === s ? 'bg-[#0b0b0b] text-[#f4f2ee]' : 'hover:bg-[#0b0b0b]/5',
+                      )}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
             </fieldset>
 

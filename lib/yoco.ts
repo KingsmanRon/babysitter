@@ -420,7 +420,7 @@ async function processPaymentSucceeded(event: YocoWebhookEvent) {
   // the order remains flagged for manual review via metadata.
   const { data: items } = await db
     .from("order_items")
-    .select("product_id, quantity")
+    .select("product_id, size, quantity")
     .eq("order_id", orderId);
 
   const stockIssues: { productId: string; quantity: number }[] = [];
@@ -428,6 +428,7 @@ async function processPaymentSucceeded(event: YocoWebhookEvent) {
     const { data: newStock, error: rpcErr } = await db.rpc("decrement_stock", {
       p_product_id: item.product_id,
       p_qty: item.quantity,
+      p_size: item.size ?? null,
     });
     if (rpcErr) {
       log.error("yoco.webhook.decrement_stock_rpc_error", {

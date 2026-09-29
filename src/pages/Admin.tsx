@@ -49,6 +49,7 @@ type AdminSummary = {
     slug: string;
     name: string;
     stock_count: number;
+    size_stock?: Record<string, number> | null;
     price_cents: number;
     currency: string;
     is_active: boolean;
@@ -245,7 +246,14 @@ export default function Admin() {
                           <td className="p-3">{p.name}</td>
                           <td className="p-3 font-mono text-xs text-gray-400">{p.slug}</td>
                           <td className="p-3 text-right">{formatZarFromCents(p.price_cents)}</td>
-                          <td className="p-3 text-right font-semibold">{p.stock_count}</td>
+                          <td className="p-3 text-right font-semibold">
+                            {p.stock_count}
+                            {p.size_stock && (
+                              <div className="text-xs font-normal text-gray-500 whitespace-nowrap">
+                                {Object.entries(p.size_stock).map(([size, n]) => `${size} ${n}`).join(" · ")}
+                              </div>
+                            )}
+                          </td>
                           <td className="p-3 text-right">{p.is_active ? "yes" : "no"}</td>
                           <td className="p-3">
                             <input

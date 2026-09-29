@@ -33,6 +33,7 @@ type ProductRow = {
   delivery_fee_cents: number | null;
   currency: string;
   stock_count: number;
+  size_stock: Record<string, number> | null;
   is_active: boolean;
   compare_at_price_cents: number | null;
   sale_price_cents: number | null;
@@ -133,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const productIds = body.items.map((i) => i.productId);
     const { data: products, error: productsErr } = await db
       .from("products")
-      .select("id, name, price_cents, delivery_fee_cents, currency, stock_count, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at")
+      .select("id, name, price_cents, delivery_fee_cents, currency, stock_count, size_stock, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at")
       .in("id", productIds);
     if (productsErr) throw productsErr;
 
@@ -165,6 +166,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res
           .status(409)
           .json({ error: `Insufficient stock for ${product.name}`, productId: product.id });
+      }
+      if (product.size_stock) {
+        const sizeAvailable = item.size ? product.size_stock[item.size] ?? 0 : 0;
+        if (sizeAvailable < item.quantity) {
+          return res.status(409).json({
+            error: item.size ? `Size ${item.size} is sold out for ${product.name}` : `A size is required for ${product.name}`,
+            productId: product.id,
+          });
+        }
       }
       const pricing = calculatePricingSnapshot(product, now);
 

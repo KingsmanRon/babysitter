@@ -15,6 +15,8 @@ export type Product = {
   images: string[];
   sizes: string[];
   stock_count: number;
+  // Per-size counts when the product tracks inventory by size.
+  size_stock?: Record<string, number> | null;
   is_active: boolean;
 };
 

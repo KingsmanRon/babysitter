@@ -25,7 +25,9 @@ on conflict (slug) do update set
   is_active   = excluded.is_active;
 
 -- S'MILANO SAVED MY LIFE tee: R500, plus R100 when the order is delivered.
-insert into public.products (slug, name, description, price_cents, delivery_fee_cents, currency, image_url, images, sizes, stock_count, is_active)
+-- 200 units, 50 per size. Stock is only set on first insert so re-running the
+-- seed never resets sales.
+insert into public.products (slug, name, description, price_cents, delivery_fee_cents, currency, image_url, images, sizes, stock_count, size_stock, is_active)
 values (
   'smilano-tee',
   'S''MILANO SAVED MY LIFE',
@@ -35,8 +37,9 @@ values (
   'ZAR',
   '/media/SSML.jpeg',
   '["/media/SSML.jpeg","/media/4gents.jpeg"]'::jsonb,
-  '["S","M","L","XL","XXL"]'::jsonb,
-  50,
+  '["S","M","L","XL"]'::jsonb,
+  200,
+  '{"S":50,"M":50,"L":50,"XL":50}'::jsonb,
   true
 )
 on conflict (slug) do update set
