@@ -58,8 +58,8 @@ VITE_ADMIN_TOKEN=<same-as-ADMIN_TOKEN>
 ## Supabase setup
 
 1. Create a new project at [supabase.com](https://supabase.com).
-2. Open the SQL editor and run `/supabase/migrations/0001_init.sql`.
-3. Run `/supabase/seed.sql` to insert the BABYSITTER product.
+2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware.
+3. Run `/supabase/seed.sql` to insert the BABYSITTER product and the S'MILANO SAVED MY LIFE tee (R500, plus R100 when delivered; 200 units split 50 each across S, M, L and XL; its page is `/smilano`).
 4. In the Supabase dashboard, go to **Database -> Replication** and confirm the `products` table is part of the `supabase_realtime` publication. The migration does this automatically; this step is just a sanity check.
 5. Copy the project URL, the service role key, and the anon key into the Vercel env vars listed above (and into `.env.local` for dev).
 

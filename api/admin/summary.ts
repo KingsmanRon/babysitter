@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: orders } = await db
       .from("orders")
       .select(
-        "id, order_number, status, amount_cents, currency, customer_email, customer_name, ship_phone, ship_line1, ship_line2, ship_suburb, ship_city, ship_province, ship_postal_code, created_at, updated_at",
+        "id, order_number, status, amount_cents, currency, customer_email, customer_name, fulfilment_method, delivery_fee_cents, ship_phone, ship_line1, ship_line2, ship_suburb, ship_city, ship_province, ship_postal_code, created_at, updated_at",
       )
       .order("created_at", { ascending: false })
       .limit(100);
@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data: products } = await db
       .from("products")
-      .select("id, slug, name, stock_count, price_cents, currency, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at")
+      .select("id, slug, name, stock_count, size_stock, price_cents, currency, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at")
       .order("created_at", { ascending: true });
 
     res.setHeader("Cache-Control", "no-store");

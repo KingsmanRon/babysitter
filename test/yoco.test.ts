@@ -4,7 +4,7 @@ import { handleYocoWebhook, type YocoWebhookEvent } from "../lib/yoco.js";
 import { setSupabaseAdminForTests } from "../lib/supabaseAdmin.js";
 
 type Order = { id: string; status: string };
-type OrderItem = { order_id: string; product_id: string; quantity: number };
+type OrderItem = { order_id: string; product_id: string; size?: string | null; quantity: number };
 type PaymentTransaction = { id: string; order_id: string; provider_checkout_id: string | null } & Record<string, unknown>;
 
 type DbState = {
@@ -12,7 +12,7 @@ type DbState = {
   order_items: OrderItem[];
   payment_transactions: PaymentTransaction[];
   payment_webhook_events: Record<string, unknown>[];
-  decrementCalls: Array<{ productId: string; quantity: number }>;
+  decrementCalls: Array<{ productId: string; quantity: number; size: string | null }>;
 };
 
 class QueryBuilder {
@@ -115,6 +115,7 @@ function createFakeSupabase(state: DbState) {
       state.decrementCalls.push({
         productId: args.p_product_id as string,
         quantity: args.p_qty as number,
+        size: args.p_size as string | null,
       });
       return { data: 10, error: null };
     },
@@ -154,7 +155,7 @@ function paymentFailedEvent(id: string, createdDate?: string): YocoWebhookEvent 
 test("duplicate payment.succeeded events decrement stock only for the paid transition", async () => {
   const state: DbState = {
     orders: [{ id: "order-1", status: "pending_payment" }],
-    order_items: [{ order_id: "order-1", product_id: "product-1", quantity: 2 }],
+    order_items: [{ order_id: "order-1", product_id: "product-1", size: "M", quantity: 2 }],
     payment_transactions: [{ id: "tx-1", order_id: "order-1", provider_checkout_id: "checkout-1", provider: "yoco" }],
     payment_webhook_events: [],
     decrementCalls: [],
@@ -169,7 +170,7 @@ test("duplicate payment.succeeded events decrement stock only for the paid trans
   }
 
   assert.equal(state.orders[0].status, "paid");
-  assert.deepEqual(state.decrementCalls, [{ productId: "product-1", quantity: 2 }]);
+  assert.deepEqual(state.decrementCalls, [{ productId: "product-1", quantity: 2, size: "M" }]);
 });
 
 test("payment.succeeded stores paid_at from event.createdDate", async () => {

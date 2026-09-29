@@ -19,6 +19,8 @@ type AdminSummary = {
     currency: string;
     customer_email: string | null;
     customer_name: string | null;
+    fulfilment_method?: string | null;
+    delivery_fee_cents?: number | null;
     ship_phone: string | null;
     ship_line1: string | null;
     ship_line2: string | null;
@@ -47,6 +49,7 @@ type AdminSummary = {
     slug: string;
     name: string;
     stock_count: number;
+    size_stock?: Record<string, number> | null;
     price_cents: number;
     currency: string;
     is_active: boolean;
@@ -243,7 +246,14 @@ export default function Admin() {
                           <td className="p-3">{p.name}</td>
                           <td className="p-3 font-mono text-xs text-gray-400">{p.slug}</td>
                           <td className="p-3 text-right">{formatZarFromCents(p.price_cents)}</td>
-                          <td className="p-3 text-right font-semibold">{p.stock_count}</td>
+                          <td className="p-3 text-right font-semibold">
+                            {p.stock_count}
+                            {p.size_stock && (
+                              <div className="text-xs font-normal text-gray-500 whitespace-nowrap">
+                                {Object.entries(p.size_stock).map(([size, n]) => `${size} ${n}`).join(" · ")}
+                              </div>
+                            )}
+                          </td>
                           <td className="p-3 text-right">{p.is_active ? "yes" : "no"}</td>
                           <td className="p-3">
                             <input
@@ -354,12 +364,20 @@ export default function Admin() {
                           <div className="text-xs text-gray-500">{o.customer_email || "—"}</div>
                         </td>
                         <td className="p-3 text-xs text-gray-400 max-w-xs">
-                          {o.ship_line1 ? (
+                          {o.fulfilment_method === "collection" ? (
+                            <>
+                              <div className="text-orange-300 font-semibold uppercase">Collection</div>
+                              {o.ship_phone && <div>{o.ship_phone}</div>}
+                            </>
+                          ) : o.ship_line1 ? (
                             <>
                               <div>{[o.ship_line1, o.ship_line2].filter(Boolean).join(", ")}</div>
                               <div>{[o.ship_suburb, o.ship_city].filter(Boolean).join(", ")}</div>
                               <div>{[o.ship_province, o.ship_postal_code].filter(Boolean).join(" ")}</div>
                               {o.ship_phone && <div>{o.ship_phone}</div>}
+                              {!!o.delivery_fee_cents && (
+                                <div className="text-gray-500">Delivery fee {formatZarFromCents(o.delivery_fee_cents)}</div>
+                              )}
                             </>
                           ) : (
                             "—"

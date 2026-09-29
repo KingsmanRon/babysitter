@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'fra
 import { Play, Pause, ChevronDown, ShoppingBag, X, Check, ArrowRight, Shield, Send, Volume2, VolumeX, Loader2, Moon, Sun } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { useInView } from 'react-intersection-observer';
+import { Link } from 'react-router-dom';
 import { cn } from './utils/cn';
 import { useProducts } from './hooks/useProducts';
 import { createOrder, createYocoCheckout, formatZarFromCents, getActiveSale, getEffectiveDisplayPriceCents, Product } from './lib/api';
@@ -1077,6 +1078,38 @@ const Newsletter = () => {
   );
 };
 
+const SmilanoTeaser = () => {
+  const { theme } = useTheme();
+  const s = theme === 'stealth';
+  return (
+    <section className={cn("px-4 sm:px-6 py-12 sm:py-20", s ? "bg-[#0a0a0a]" : "bg-black")}>
+      <Link
+        to="/smilano"
+        className="group relative block max-w-7xl mx-auto overflow-hidden rounded-3xl border border-white/10 bg-[#d9d5cf]"
+      >
+        <div className="grid md:grid-cols-2 items-center">
+          <div className="p-6 sm:p-12 space-y-4 text-black">
+            <span className="inline-block px-3 py-1 bg-[#ff3b1f] text-xs font-bold uppercase tracking-widest">New drop</span>
+            <h3 className="font-anton uppercase text-5xl sm:text-7xl leading-[0.88]">S’milano saved my life</h3>
+            <p className="text-black/70 max-w-sm">The tee for the Vaal’s high-velocity movement. R500.</p>
+            <span className="inline-flex items-center gap-2 font-bold uppercase tracking-wide">
+              Enter the drop <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </span>
+          </div>
+          <div className="relative h-64 md:h-full md:min-h-[420px] overflow-hidden">
+            <img
+              src="/media/4gents.jpeg"
+              alt="Four men wearing the S’MILANO SAVED MY LIFE tee"
+              loading="lazy"
+              className="absolute inset-0 w-full h-full object-cover object-[center_35%] group-hover:scale-105 transition-transform duration-700"
+            />
+          </div>
+        </div>
+      </Link>
+    </section>
+  );
+};
+
 interface FooterProps {
   onOpenPrivacy: () => void;
   onOpenTerms: () => void;
@@ -1107,7 +1140,7 @@ const Footer = ({ onOpenPrivacy, onOpenTerms }: FooterProps) => {
             <h4 className="text-white font-semibold mb-4">Shop</h4>
             <ul className="space-y-2 text-gray-500">
               <li><a href="#" className={cn("transition-colors", linkHover)}>All Products</a></li>
-              <li><a href="#" className={cn("transition-colors", linkHover)}>New Arrivals</a></li>
+              <li><Link to="/smilano" className={cn("transition-colors", linkHover)}>New Arrivals</Link></li>
               <li><a href="#" className={cn("transition-colors", linkHover)}>Best Sellers</a></li>
               <li><a href="#" className={cn("transition-colors", linkHover)}>Sale</a></li>
             </ul>
@@ -1253,6 +1286,8 @@ export default function App() {
             onAddToCart={handleAddToCart}
           />
         )}
+
+        <SmilanoTeaser />
 
         <Footer onOpenPrivacy={() => setShowPrivacy(true)} onOpenTerms={() => setShowTerms(true)} />
 
