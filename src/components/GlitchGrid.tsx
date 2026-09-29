@@ -3,14 +3,16 @@ import { useReducedMotion } from 'framer-motion';
 
 const CELL = 60;
 const GRID = `
-  linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-  linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)
+  linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
 `;
 
 type Glitch =
   | { kind: 'static'; x: number; y: number; w: number; h: number; until: number }
   | { kind: 'line'; vertical: boolean; at: number; from: number; to: number; until: number }
-  | { kind: 'tear'; y: number; h: number; shift: number; until: number };
+  | { kind: 'tear'; y: number; h: number; shift: number; until: number }
+  | { kind: 'band'; y: number; h: number; until: number }
+  | { kind: 'flash'; until: number };
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const randInt = (min: number, max: number) => Math.floor(rand(min, max + 1));
@@ -62,7 +64,7 @@ export default function GlitchGrid() {
           to: from + randInt(2, 6) * CELL,
           until: now + rand(60, 240),
         });
-      } else {
+      } else if (roll < 0.92) {
         glitches.push({
           kind: 'tear',
           y: randInt(0, rows - 1) * CELL + rand(0, CELL / 2),
@@ -70,6 +72,17 @@ export default function GlitchGrid() {
           shift: rand(-26, 26),
           until: now + rand(80, 200),
         });
+      } else {
+        glitches.push({ kind: 'band', y: rand(0, height), h: rand(10, 50), until: now + rand(60, 160) });
+      }
+    };
+
+    const noise = (x: number, y: number, w: number, h: number, block: number, maxAlpha: number) => {
+      for (let yy = y; yy < y + h; yy += block) {
+        for (let xx = x; xx < x + w; xx += block) {
+          ctx.fillStyle = `rgba(255,255,255,${Math.random() * maxAlpha})`;
+          ctx.fillRect(xx, yy, block, block);
+        }
       }
     };
 
@@ -89,19 +102,19 @@ export default function GlitchGrid() {
       last = now;
 
       glitches = glitches.filter((g) => g.until > now);
-      if (Math.random() < 0.07) spawn(now);
-      if (Math.random() < 0.008) for (let i = 0; i < 5; i++) spawn(now); // a rare bigger hit
+      if (Math.random() < 0.15) spawn(now);
+      if (Math.random() < 0.025) for (let i = 0; i < 6; i++) spawn(now); // a bigger hit
+      if (Math.random() < 0.005) glitches.push({ kind: 'flash', until: now + rand(60, 130) }); // whole screen fuzzes
 
       ctx.clearRect(0, 0, width, height);
       ctx.lineWidth = 1;
       for (const g of glitches) {
-        if (g.kind === 'static') {
-          for (let y = g.y; y < g.y + g.h; y += 3) {
-            for (let x = g.x; x < g.x + g.w; x += 3) {
-              ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.14})`;
-              ctx.fillRect(x, y, 3, 3);
-            }
-          }
+        if (g.kind === 'flash') {
+          noise(0, 0, width, height, 5, 0.07);
+        } else if (g.kind === 'band') {
+          noise(0, g.y, width, g.h, 3, 0.16);
+        } else if (g.kind === 'static') {
+          noise(g.x, g.y, g.w, g.h, 3, 0.22);
           ctx.strokeStyle = 'rgba(255,255,255,0.12)';
           ctx.strokeRect(g.x + 0.5, g.y + 0.5, g.w, g.h);
         } else if (g.kind === 'line') {
