@@ -23,3 +23,29 @@ on conflict (slug) do update set
   images      = excluded.images,
   sizes       = excluded.sizes,
   is_active   = excluded.is_active;
+
+-- S'MILANO SAVED MY LIFE tee: R500, plus R100 when the order is delivered.
+insert into public.products (slug, name, description, price_cents, delivery_fee_cents, currency, image_url, images, sizes, stock_count, is_active)
+values (
+  'smilano-tee',
+  'S''MILANO SAVED MY LIFE',
+  'Heavyweight black tee with an oversized cracked-print S''MILANO SAVED MY LIFE graphic. Made for the Vaal, worn everywhere.',
+  50000,
+  10000,
+  'ZAR',
+  '/media/SSML.jpeg',
+  '["/media/SSML.jpeg","/media/4gents.jpeg"]'::jsonb,
+  '["S","M","L","XL","XXL"]'::jsonb,
+  50,
+  true
+)
+on conflict (slug) do update set
+  name               = excluded.name,
+  description        = excluded.description,
+  price_cents        = excluded.price_cents,
+  delivery_fee_cents = excluded.delivery_fee_cents,
+  currency           = excluded.currency,
+  image_url          = excluded.image_url,
+  images             = excluded.images,
+  sizes              = excluded.sizes,
+  is_active          = excluded.is_active;

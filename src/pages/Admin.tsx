@@ -19,6 +19,8 @@ type AdminSummary = {
     currency: string;
     customer_email: string | null;
     customer_name: string | null;
+    fulfilment_method?: string | null;
+    delivery_fee_cents?: number | null;
     ship_phone: string | null;
     ship_line1: string | null;
     ship_line2: string | null;
@@ -354,12 +356,20 @@ export default function Admin() {
                           <div className="text-xs text-gray-500">{o.customer_email || "—"}</div>
                         </td>
                         <td className="p-3 text-xs text-gray-400 max-w-xs">
-                          {o.ship_line1 ? (
+                          {o.fulfilment_method === "collection" ? (
+                            <>
+                              <div className="text-orange-300 font-semibold uppercase">Collection</div>
+                              {o.ship_phone && <div>{o.ship_phone}</div>}
+                            </>
+                          ) : o.ship_line1 ? (
                             <>
                               <div>{[o.ship_line1, o.ship_line2].filter(Boolean).join(", ")}</div>
                               <div>{[o.ship_suburb, o.ship_city].filter(Boolean).join(", ")}</div>
                               <div>{[o.ship_province, o.ship_postal_code].filter(Boolean).join(" ")}</div>
                               {o.ship_phone && <div>{o.ship_phone}</div>}
+                              {!!o.delivery_fee_cents && (
+                                <div className="text-gray-500">Delivery fee {formatZarFromCents(o.delivery_fee_cents)}</div>
+                              )}
                             </>
                           ) : (
                             "—"

@@ -12,9 +12,11 @@ type ShippingInput = {
   province?: string;
   postalCode?: string;
 };
+type FulfilmentMethod = "delivery" | "collection";
 type CreateOrderBody = {
   customerEmail?: string;
   customerName?: string;
+  fulfilment?: FulfilmentMethod;
   shipping?: ShippingInput;
   items: ItemInput[];
 };
@@ -28,6 +30,7 @@ type ProductRow = {
   id: string;
   name: string;
   price_cents: number;
+  delivery_fee_cents: number | null;
   currency: string;
   stock_count: number;
   is_active: boolean;
@@ -90,6 +93,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  const fulfilment: FulfilmentMethod = body.fulfilment ?? "delivery";
+  if (fulfilment !== "delivery" && fulfilment !== "collection") {
+    return res.status(400).json({ error: "fulfilment must be delivery or collection" });
+  }
+
   const ship = body.shipping ?? {};
   const shipping = {
     phone: (ship.phone ?? "").trim(),
@@ -100,18 +108,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     province: (ship.province ?? "").trim(),
     postalCode: (ship.postalCode ?? "").trim(),
   };
-  const missingShip = (
-    [
-      ["phone number", shipping.phone],
-      ["street address", shipping.line1],
-      ["suburb", shipping.suburb],
-      ["city", shipping.city],
-      ["province", shipping.province],
-      ["postal code", shipping.postalCode],
-    ] as const
-  ).find(([, value]) => !value);
+  const isDelivery = fulfilment === "delivery";
+  // Collection orders only need a phone number so we can arrange pickup.
+  const requiredShip: Array<readonly [string, string]> =
+    isDelivery
+      ? [
+          ["phone number", shipping.phone],
+          ["street address", shipping.line1],
+          ["suburb", shipping.suburb],
+          ["city", shipping.city],
+          ["province", shipping.province],
+          ["postal code", shipping.postalCode],
+        ]
+      : [["phone number", shipping.phone]];
+  const missingShip = requiredShip.find(([, value]) => !value);
   if (missingShip) {
-    return res.status(400).json({ error: `Delivery ${missingShip[0]} is required` });
+    const label = isDelivery ? "Delivery" : "Contact";
+    return res.status(400).json({ error: `${label} ${missingShip[0]} is required` });
   }
 
   try {
@@ -120,13 +133,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const productIds = body.items.map((i) => i.productId);
     const { data: products, error: productsErr } = await db
       .from("products")
-      .select("id, name, price_cents, currency, stock_count, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at")
+      .select("id, name, price_cents, delivery_fee_cents, currency, stock_count, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at")
       .in("id", productIds);
     if (productsErr) throw productsErr;
 
     const productMap = new Map((products || []).map((p) => [p.id, p]));
 
     let totalCents = 0;
+    // One delivery per order: charge the highest fee among the items.
+    let deliveryFeeCents = 0;
     let currency = "ZAR";
     const itemRows: Array<{
       product_id: string;
@@ -154,6 +169,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const pricing = calculatePricingSnapshot(product, now);
 
       totalCents += pricing.effectiveUnitPriceCents * item.quantity;
+      if (isDelivery) {
+        deliveryFeeCents = Math.max(deliveryFeeCents, product.delivery_fee_cents ?? 0);
+      }
       currency = product.currency;
       itemRows.push({
         product_id: product.id,
@@ -168,6 +186,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    totalCents += deliveryFeeCents;
+
     const orderNumber = generateOrderNumber();
     const { data: order, error: orderErr } = await db
       .from("orders")
@@ -175,13 +195,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         order_number: orderNumber,
         customer_email: body.customerEmail ?? null,
         customer_name: body.customerName ?? null,
+        fulfilment_method: fulfilment,
+        delivery_fee_cents: deliveryFeeCents,
         ship_phone: shipping.phone,
-        ship_line1: shipping.line1,
-        ship_line2: shipping.line2 || null,
-        ship_suburb: shipping.suburb,
-        ship_city: shipping.city,
-        ship_province: shipping.province,
-        ship_postal_code: shipping.postalCode,
+        ship_line1: isDelivery ? shipping.line1 : null,
+        ship_line2: isDelivery ? shipping.line2 || null : null,
+        ship_suburb: isDelivery ? shipping.suburb : null,
+        ship_city: isDelivery ? shipping.city : null,
+        ship_province: isDelivery ? shipping.province : null,
+        ship_postal_code: isDelivery ? shipping.postalCode : null,
         currency,
         amount_cents: totalCents,
         status: "draft",

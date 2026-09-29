@@ -4,6 +4,7 @@ export type Product = {
   name: string;
   description: string | null;
   price_cents: number;
+  delivery_fee_cents?: number | null;
   compare_at_price_cents?: number | null;
   sale_price_cents?: number | null;
   discount_percent_bps?: number | null;
@@ -73,9 +74,12 @@ export type ShippingAddress = {
   postalCode: string;
 };
 
+export type FulfilmentMethod = "delivery" | "collection";
+
 export async function createOrder(input: {
   customerEmail: string;
   customerName: string;
+  fulfilment?: FulfilmentMethod;
   shipping: ShippingAddress;
   items: Array<{ productId: string; size?: string; quantity: number }>;
 }): Promise<Order> {

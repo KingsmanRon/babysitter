@@ -1,1 +1,7 @@
 @import "tailwindcss";
+
+@theme {
+  --font-anton: "Anton", "Impact", "Arial Narrow", sans-serif;
+  --font-archivo: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-jbmono: "JetBrains Mono", ui-monospace, monospace;
+}

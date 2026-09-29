@@ -8,6 +8,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
 import PaymentFailed from "./pages/PaymentFailed";
 import Admin from "./pages/Admin";
+import Smilano from "./pages/Smilano";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -19,6 +20,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/payment/cancelled" element={<PaymentCancelled />} />
         <Route path="/payment/failed" element={<PaymentFailed />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/smilano" element={<Smilano />} />
         <Route path="*" element={<App />} />
       </Routes>
     </BrowserRouter>
