@@ -1,5 +1,7 @@
--- Seed the single BABYSITTER product variant set.
--- Safe to run repeatedly; uses slug as the idempotency key.
+-- Seed products. Safe to run repeatedly; uses slug as the idempotency key.
+
+-- Drop 001, the original BABYSITTER tee. Sold out and retired: kept inactive
+-- so past orders still reference it, with its imagery removed from the site.
 
 insert into public.products (slug, name, description, price_cents, currency, image_url, images, sizes, stock_count, is_active)
 values (
@@ -8,11 +10,11 @@ values (
   'Premium streetwear crafted for everyday confidence. Featuring tailored fits, breathable fabrics, and timeless style for any occasion.',
   24900,
   'ZAR',
-  '/media/boygirl.jpeg',
-  '["/media/boygirl.jpeg","/media/boy.jpeg","/media/pinkracer.jpeg","/media/girl.jpeg","/media/greenracer.jpeg"]'::jsonb,
+  null,
+  '[]'::jsonb,
   '["XS","S","M","L","XL","XXL"]'::jsonb,
-  50,
-  true
+  0,
+  false
 )
 on conflict (slug) do update set
   name        = excluded.name,

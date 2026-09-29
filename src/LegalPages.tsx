@@ -73,7 +73,6 @@ export const PrivacyPolicyModal = ({ isOpen, onClose }: LegalModalProps) => (
                 <li><strong className="text-gray-200">Yoco</strong> — for secure payment processing (PCI DSS compliant)</li>
                 <li><strong className="text-gray-200">Vercel</strong> — for website hosting and content delivery</li>
                 <li><strong className="text-gray-200">Supabase</strong> — for order and product data storage</li>
-                <li><strong className="text-gray-200">EmailJS</strong> — for transactional email delivery</li>
               </ul>
               <p className="mt-2">We do not sell, rent, or trade your personal information to any other third parties.</p>
             </section>
@@ -194,8 +193,8 @@ export const TermsOfServiceModal = ({ isOpen, onClose }: LegalModalProps) => (
             <section>
               <h3 className="text-white font-semibold text-base mb-2">4. Shipping & Delivery</h3>
               <ul className="list-disc list-inside space-y-1 text-gray-400">
-                <li>We offer free standard shipping within South Africa on all orders.</li>
-                <li>Delivery times are estimated at 5–10 business days depending on your location.</li>
+                <li>Any delivery fee is shown at checkout before you pay. Where collection is offered, you can choose it at no fee.</li>
+                <li>Delivery times are estimated at 3–5 business days depending on your location.</li>
                 <li>We are not liable for delays caused by the courier service or circumstances beyond our control.</li>
                 <li>Risk of loss passes to the buyer upon delivery to the shipping address provided.</li>
               </ul>

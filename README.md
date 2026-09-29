@@ -1,6 +1,6 @@
 # BABYSITTER
 
-E-commerce site for the BABYSITTER drop. Single-product, single-page shop with a Yoco-hosted checkout and webhook-confirmed payment state.
+E-commerce site for BABYSITTER drops. A landing page and help desk at `/` (and `/help`), plus a page per drop (currently `/smilano`) with a Yoco-hosted checkout and webhook-confirmed payment state.
 
 ## Stack
 
@@ -101,8 +101,8 @@ The webhook must be registered against a publicly reachable URL, so you need at 
 
 ## End-to-end test flow
 
-1. Open the deployed site.
-2. Pick a size, add to cart, fill in email and name, click **Pay**.
+1. Open `/smilano` on the deployed site.
+2. Pick a size and delivery or collection, click **Cop it**, fill in your details, click **Pay**.
 3. The browser redirects to a Yoco-hosted checkout page.
 4. Use a Yoco test card:
    - Number: `4111 1111 1111 1111`
@@ -198,7 +198,8 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 
 ### Frontend
 
-- `src/App.tsx` — landing + product + cart + checkout modal. Talks to `/api`.
+- `src/pages/Home.tsx` — landing page and help desk (served at `/` and `/help`).
+- `src/pages/Smilano.tsx` — S'MILANO drop page with its own checkout. Talks to `/api`.
 - `src/pages/Payment*` — payment status pages. Read-only; they rely on the webhook for truth.
 - `src/pages/Admin.tsx` — admin orders / transactions / stock view.
 - `src/lib/api.ts` — frontend fetch helpers.
