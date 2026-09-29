@@ -559,7 +559,7 @@ export default function Home() {
             to="/"
             className="text-white font-extrabold text-lg tracking-[3px] uppercase hover:opacity-80 transition-opacity"
           >
-            BABYSITTER
+            BABYSITTER<span className="align-super text-[0.7em] tracking-normal -ml-0.5">™</span>
           </Link>
           <Link
             to={CATALOG_PATH}
