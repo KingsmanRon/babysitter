@@ -5,3 +5,16 @@
   --font-archivo: "Archivo", ui-sans-serif, system-ui, sans-serif;
   --font-jbmono: "JetBrains Mono", ui-monospace, monospace;
 }
+
+@theme {
+  --animate-marquee: marquee 40s linear infinite;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+}
