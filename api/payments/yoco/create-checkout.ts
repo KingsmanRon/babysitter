@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createYocoCheckout } from "../../../lib/yoco.js";
+import { createYocoCheckout, SoldOutError } from "../../../lib/yoco.js";
 import { log } from "../../../lib/logger.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -15,6 +15,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { redirectUrl, checkoutId } = await createYocoCheckout(orderId);
     return res.status(200).json({ redirectUrl, checkoutId });
   } catch (err) {
+    if (err instanceof SoldOutError) {
+      return res.status(409).json({ error: err.message });
+    }
     const message = (err as Error).message || "Checkout creation failed";
     log.error("api.create_checkout.error", { orderId, err: message });
     return res.status(500).json({ error: "Unable to start checkout. Please try again." });

@@ -57,6 +57,13 @@ export type YocoWebhookEvent = {
 // ──────────────────────────────────────────────────────────────
 // createYocoCheckout — server-side checkout creation
 // ──────────────────────────────────────────────────────────────
+export class SoldOutError extends Error {
+  constructor() {
+    super("Sorry, that size just sold out. Pick another size.");
+    this.name = "SoldOutError";
+  }
+}
+
 export async function createYocoCheckout(orderId: string): Promise<{ redirectUrl: string; checkoutId: string }> {
   const db = supabaseAdmin();
 
@@ -71,6 +78,20 @@ export async function createYocoCheckout(orderId: string): Promise<{ redirectUrl
   }
   if (order.status === "paid") {
     throw new Error("Order is already paid");
+  }
+
+  // Restart the stock hold for the time the buyer spends on Yoco's page. If
+  // the hold already lapsed and the units went to someone else, stop here
+  // rather than take a payment we can't fulfil.
+  const { data: reserved, error: reserveErr } = await db.rpc("reserve_order_stock", {
+    p_order_id: order.id,
+  });
+  if (reserveErr) {
+    log.error("yoco.create_checkout.reserve_failed", { orderId, err: reserveErr.message });
+    throw new Error("Failed to reserve stock");
+  }
+  if (reserved !== true) {
+    throw new SoldOutError();
   }
 
   // Idempotency: if we already created a checkout for this order in a
@@ -448,35 +469,25 @@ async function processPaymentSucceeded(event: YocoWebhookEvent) {
     return;
   }
 
-  // Decrement stock atomically per item. If any decrement returns null,
-  // the order remains flagged for manual review via metadata.
-  const { data: items } = await db
-    .from("order_items")
-    .select("product_id, size, quantity")
-    .eq("order_id", orderId);
-
-  const stockIssues: { productId: string; quantity: number }[] = [];
-  for (const item of items || []) {
-    const { data: newStock, error: rpcErr } = await db.rpc("decrement_stock", {
-      p_product_id: item.product_id,
-      p_qty: item.quantity,
-      p_size: item.size ?? null,
-    });
-    if (rpcErr) {
-      log.error("yoco.webhook.decrement_stock_rpc_error", {
-        orderId,
-        productId: item.product_id,
-        err: rpcErr.message,
-      });
-      stockIssues.push({ productId: item.product_id, quantity: item.quantity });
-      continue;
+  // Turn the stock hold into a sale. If the hold expired and the units were
+  // sold to someone else meanwhile, the order is paid but can't be fulfilled:
+  // flag it so it shows up for a refund.
+  const { data: committed, error: commitErr } = await db.rpc("commit_order_stock", {
+    p_order_id: orderId,
+  });
+  if (commitErr || committed !== true) {
+    if (commitErr) {
+      log.error("yoco.webhook.commit_stock_rpc_error", { orderId, err: commitErr.message });
     }
-    if (newStock === null) {
-      stockIssues.push({ productId: item.product_id, quantity: item.quantity });
-    }
-  }
-
-  if (stockIssues.length > 0) {
+    const { data: items } = await db
+      .from("order_items")
+      .select("product_id, size, quantity")
+      .eq("order_id", orderId);
+    const stockIssues = (items || []).map((item) => ({
+      productId: item.product_id,
+      size: item.size ?? null,
+      quantity: item.quantity,
+    }));
     log.warn("yoco.webhook.stock_flags", { orderId, stockIssues });
     await db
       .from("orders")

@@ -28,6 +28,7 @@ type AdminSummary = {
     ship_city: string | null;
     ship_province: string | null;
     ship_postal_code: string | null;
+    metadata?: { stock_flags?: unknown[] } | null;
     created_at: string;
   }>;
   transactions: Array<{
@@ -357,6 +358,9 @@ export default function Admin() {
                           >
                             {o.status}
                           </span>
+                          {o.metadata?.stock_flags?.length ? (
+                            <div className="text-xs font-semibold text-amber-400">Out of stock: refund</div>
+                          ) : null}
                         </td>
                         <td className="p-3 text-right">{formatZarFromCents(o.amount_cents)}</td>
                         <td className="p-3">

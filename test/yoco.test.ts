@@ -1,12 +1,12 @@
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
-import { handleYocoWebhook, type YocoWebhookEvent } from "../lib/yoco.js";
+import { createYocoCheckout, handleYocoWebhook, SoldOutError, type YocoWebhookEvent } from "../lib/yoco.js";
 import { setSupabaseAdminForTests } from "../lib/supabaseAdmin.js";
 import { readRawBody } from "../lib/rawBody.js";
 import { PassThrough } from "node:stream";
 import type { IncomingMessage } from "node:http";
 
-type Order = { id: string; status: string };
+type Order = { id: string; status: string; metadata?: Record<string, unknown> } & Record<string, unknown>;
 type OrderItem = { order_id: string; product_id: string; size?: string | null; quantity: number };
 type PaymentTransaction = { id: string; order_id: string; provider_checkout_id: string | null } & Record<string, unknown>;
 
@@ -17,6 +17,7 @@ type DbState = {
   payment_webhook_events: Record<string, unknown>[];
   decrementCalls: Array<{ productId: string; quantity: number; size: string | null }>;
   failOrderUpdates?: number;
+  soldOut?: boolean;
 };
 
 class QueryBuilder {
@@ -124,13 +125,18 @@ function createFakeSupabase(state: DbState) {
       return new QueryBuilder(state, table);
     },
     async rpc(name: string, args: Record<string, unknown>) {
-      assert.equal(name, "decrement_stock");
-      state.decrementCalls.push({
-        productId: args.p_product_id as string,
-        quantity: args.p_qty as number,
-        size: args.p_size as string | null,
-      });
-      return { data: 10, error: null };
+      const orderId = args.p_order_id as string;
+      if (name === "commit_order_stock") {
+        const ok = !state.soldOut;
+        if (ok) {
+          for (const item of state.order_items.filter((i) => i.order_id === orderId)) {
+            state.decrementCalls.push({ productId: item.product_id, quantity: item.quantity, size: item.size ?? null });
+          }
+        }
+        return { data: ok, error: null };
+      }
+      if (name === "reserve_order_stock") return { data: !state.soldOut, error: null };
+      throw new Error(`unexpected rpc ${name}`);
     },
   };
 }
@@ -336,4 +342,37 @@ test("readRawBody returns the exact bytes after Vercel's helpers buffer and repl
   replay.end(raw);
 
   assert.deepEqual(await readRawBody(req), raw);
+});
+
+test("a paid order whose stock is gone is flagged for a refund", async () => {
+  const state = { ...pendingOrderState(), soldOut: true };
+  setSupabaseAdminForTests(createFakeSupabase(state) as never);
+
+  try {
+    await handleYocoWebhook(paymentSucceededEvent("event-1"), {}, true);
+  } finally {
+    setSupabaseAdminForTests(null);
+  }
+
+  assert.equal(state.orders[0].status, "paid");
+  assert.deepEqual(state.orders[0].metadata?.stock_flags, [{ productId: "product-1", size: "M", quantity: 1 }]);
+});
+
+test("checkout refuses to start when the order's stock can no longer be held", async () => {
+  const state = { ...pendingOrderState(), soldOut: true };
+  state.orders[0] = { ...state.orders[0], order_number: "BS-1", amount_cents: 60000, currency: "ZAR" };
+  setSupabaseAdminForTests(createFakeSupabase(state) as never);
+  process.env.YOCO_SECRET_KEY = "sk_test_unused";
+  const fetchMock = mock.method(globalThis, "fetch", async () => {
+    throw new Error("Yoco must not be called");
+  });
+
+  try {
+    await assert.rejects(createYocoCheckout("order-1"), SoldOutError);
+    assert.equal(fetchMock.mock.callCount(), 0);
+  } finally {
+    fetchMock.mock.restore();
+    setSupabaseAdminForTests(null);
+    delete process.env.YOCO_SECRET_KEY;
+  }
 });
