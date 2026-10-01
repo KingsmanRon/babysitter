@@ -94,8 +94,8 @@ function parseNullableInteger(value: string, field: string, max?: number): numbe
 }
 
 export default function Admin() {
-  const envToken = (import.meta.env.VITE_ADMIN_TOKEN as string | undefined) || "";
-  const [token, setToken] = useState(() => sessionStorage.getItem("admin_token") || envToken);
+  // Typed in by the admin, never read from a VITE_ var: those ship in the public bundle.
+  const [token, setToken] = useState(() => sessionStorage.getItem("admin_token") || "");
   const [data, setData] = useState<AdminSummary | null>(null);
   const [saleDrafts, setSaleDrafts] = useState<Record<string, ProductSaleDraft>>({});
   const [savingProductId, setSavingProductId] = useState<string | null>(null);

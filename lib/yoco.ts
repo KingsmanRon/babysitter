@@ -298,12 +298,43 @@ export async function handleYocoWebhook(
     payload_json: event as unknown as Record<string, unknown>,
   });
   if (insertErr) {
-    if (insertErr.code === "23505") {
+    if (insertErr.code !== "23505") {
+      log.error("yoco.webhook.insert_failed", { eventId: event.id, err: insertErr.message });
+      throw new Error("Failed to persist webhook event");
+    }
+
+    // Seen this event before. Only skip it if it was actually processed: an
+    // earlier delivery may have been stored with a bad signature (e.g. a
+    // misconfigured secret) or failed partway, and Yoco's retry has to be
+    // allowed to finish the job. Fulfilment is guarded by the paid transition,
+    // so reprocessing never double-decrements stock.
+    const { data: existing, error: existingErr } = await db
+      .from("payment_webhook_events")
+      .select("processed_at, signature_valid")
+      .eq("provider", "yoco")
+      .eq("provider_event_id", event.id)
+      .maybeSingle();
+    if (existingErr) {
+      log.error("yoco.webhook.lookup_failed", { eventId: event.id, err: existingErr.message });
+      throw new Error("Failed to look up webhook event");
+    }
+    if (existing?.processed_at || !signatureValid) {
       log.info("yoco.webhook.duplicate", { eventId: event.id, type: event.type });
       return { ok: true, duplicate: true };
     }
-    log.error("yoco.webhook.insert_failed", { eventId: event.id, err: insertErr.message });
-    throw new Error("Failed to persist webhook event");
+    if (!existing?.signature_valid) {
+      await db
+        .from("payment_webhook_events")
+        .update({
+          signature_valid: true,
+          webhook_id: webhookId,
+          webhook_timestamp: webhookTimestamp,
+          payload_json: event as unknown as Record<string, unknown>,
+        })
+        .eq("provider", "yoco")
+        .eq("provider_event_id", event.id);
+    }
+    log.info("yoco.webhook.retry_unprocessed", { eventId: event.id, type: event.type });
   }
 
   if (!signatureValid) {
@@ -408,7 +439,8 @@ async function processPaymentSucceeded(event: YocoWebhookEvent) {
     .maybeSingle();
   if (orderErr) {
     log.error("yoco.webhook.order_update_failed", { orderId, err: orderErr.message });
-    return;
+    // Throw so the event stays unprocessed and Yoco's retry can mark it paid.
+    throw new Error("Failed to mark order paid");
   }
 
   if (!paidOrder) {

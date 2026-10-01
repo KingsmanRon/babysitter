@@ -24,7 +24,7 @@ All server-only variables must be set in Vercel without the `VITE_` prefix. Anyt
 | `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only, bypasses RLS) |
 | `ADMIN_TOKEN` | Any random string used to authenticate `/admin` requests |
-| `PUBLIC_SITE_URL` | Optional override; defaults to `https://$VERCEL_URL` in production or `http://localhost:5173` in dev |
+| `PUBLIC_SITE_URL` | Where Yoco sends customers after paying, e.g. `https://yourdomain.co.za`. Set it in Production. Defaults to the project's production domain in production, `https://$VERCEL_URL` in previews, or `http://localhost:5173` in dev |
 
 ### Client-safe (exposed to the browser)
 
@@ -32,11 +32,10 @@ All server-only variables must be set in Vercel without the `VITE_` prefix. Anyt
 | --- | --- |
 | `VITE_SUPABASE_URL` | Same value as `SUPABASE_URL` |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon key (safe under RLS) |
-| `VITE_ADMIN_TOKEN` | Only used by the `/admin` page UI to call the admin API |
 
 ### Security warning
 
-**Never** prefix `YOCO_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` with `VITE_`. Any var with `VITE_` is inlined into the client bundle and will leak to the browser.
+**Never** prefix `YOCO_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY` or `ADMIN_TOKEN` with `VITE_`. Any var with `VITE_` is inlined into the client bundle and will leak to the browser.
 
 Example `.env.local`:
 
@@ -52,7 +51,6 @@ PUBLIC_SITE_URL=http://localhost:3000
 # Client-safe
 VITE_SUPABASE_URL=<same-as-SUPABASE_URL>
 VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
-VITE_ADMIN_TOKEN=<same-as-ADMIN_TOKEN>
 ```
 
 ## Supabase setup
@@ -135,7 +133,7 @@ The webhook must be registered against a publicly reachable URL, so you need at 
 
 ## Admin
 
-- The `/admin` page in the frontend prompts for `ADMIN_TOKEN`, then shows orders, transactions, and product stock.
+- The `/admin` page in the frontend prompts for `ADMIN_TOKEN`, then shows orders, transactions, and product stock. Type the token in; do not set a `VITE_ADMIN_TOKEN` env var, since it would be published in the site's JavaScript.
 - `/api/admin/summary` returns the same data as JSON. Authenticate with either:
   - `X-Admin-Token: <token>` header, or
   - `?token=<token>` query param.
