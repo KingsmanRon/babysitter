@@ -24,7 +24,7 @@ All server-only variables must be set in Vercel without the `VITE_` prefix. Anyt
 | `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only, bypasses RLS) |
 | `ADMIN_TOKEN` | Any random string used to authenticate `/admin` requests |
-| `PUBLIC_SITE_URL` | Optional override; defaults to `https://$VERCEL_URL` in production or `http://localhost:5173` in dev |
+| `PUBLIC_SITE_URL` | Where Yoco sends customers after paying, e.g. `https://yourdomain.co.za`. Set it in Production. Defaults to the project's production domain in production, `https://$VERCEL_URL` in previews, or `http://localhost:5173` in dev |
 
 ### Client-safe (exposed to the browser)
 
@@ -32,11 +32,10 @@ All server-only variables must be set in Vercel without the `VITE_` prefix. Anyt
 | --- | --- |
 | `VITE_SUPABASE_URL` | Same value as `SUPABASE_URL` |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon key (safe under RLS) |
-| `VITE_ADMIN_TOKEN` | Only used by the `/admin` page UI to call the admin API |
 
 ### Security warning
 
-**Never** prefix `YOCO_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` with `VITE_`. Any var with `VITE_` is inlined into the client bundle and will leak to the browser.
+**Never** prefix `YOCO_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY` or `ADMIN_TOKEN` with `VITE_`. Any var with `VITE_` is inlined into the client bundle and will leak to the browser.
 
 Example `.env.local`:
 
@@ -52,13 +51,12 @@ PUBLIC_SITE_URL=http://localhost:3000
 # Client-safe
 VITE_SUPABASE_URL=<same-as-SUPABASE_URL>
 VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
-VITE_ADMIN_TOKEN=<same-as-ADMIN_TOKEN>
 ```
 
 ## Supabase setup
 
 1. Create a new project at [supabase.com](https://supabase.com).
-2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware.
+2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied.
 3. Run `/supabase/seed.sql` to insert the BABYSITTER product and the S'MILANO SAVED MY LIFE tee (R500, plus R100 when delivered; 200 units split 50 each across S, M, L and XL; its page is `/smilano`).
 4. In the Supabase dashboard, go to **Database -> Replication** and confirm the `products` table is part of the `supabase_realtime` publication. The migration does this automatically; this step is just a sanity check.
 5. Copy the project URL, the service role key, and the anon key into the Vercel env vars listed above (and into `.env.local` for dev).
@@ -114,7 +112,7 @@ The webhook must be registered against a publicly reachable URL, so you need at 
    - The `orders` row is `paid`.
    - `payment_transactions` has a `paid_at` timestamp.
    - `payment_webhook_events` contains the event with `signature_valid = true`.
-   - `products.stock_count` has been decremented.
+   - `products.stock_count` went down when you clicked **Pay** (the hold), and the order's `stock_state` is `committed`.
 
 ## Going live
 
@@ -129,13 +127,16 @@ The webhook must be registered against a publicly reachable URL, so you need at 
 - **Source of truth for payment state is the webhook**, not the success-page redirect. The redirect URL is advisory — users can close the tab, lose network, or hit back. The webhook is the authoritative write.
 - **Idempotency on webhooks**: `payment_webhook_events` has a unique constraint on `(provider, provider_event_id)`, so duplicate deliveries from Yoco are dropped at the database level.
 - **Idempotency on checkout creation**: re-clicking Pay on the same order returns the existing Yoco checkout URL instead of creating a duplicate session.
-- **Stock decrement is atomic**: stock is decremented via the Postgres function `decrement_stock(product_id, qty)` and **only** when a verified `payment.succeeded` webhook arrives. Adding to cart does not reserve stock.
+- **Stock is held while the buyer pays**: creating an order calls `reserve_order_stock`, which takes every item out of stock atomically (all or nothing) and holds it for 30 minutes. If the last unit is gone, the buyer gets a 409 "sold out" before reaching Yoco, so a drop can't take more payments than it has units.
+- **Abandoned holds come back**: `release_expired_reservations` puts unpaid, expired holds back on sale. The API runs it whenever products are listed or an order is created, so no cron job is needed.
+- **Payment commits the hold**: a verified `payment.succeeded` webhook calls `commit_order_stock`. If the hold had already expired, it takes the stock again; if the units were sold to someone else meanwhile, the paid order is flagged (`metadata.stock_flags`) and shows "Out of stock: refund" in `/admin`.
+- **Stock functions are server-only**: execute rights on the stock functions are revoked from `anon` and `authenticated`, so the public anon key can't change stock.
 - **Live stock counts**: the frontend subscribes to Supabase Realtime `UPDATE` events on the `products` table, so stock counts update live without polling.
 - **No card data is stored**. Only safe metadata (card brand, last 4 digits) from Yoco's payment method details is persisted.
 
 ## Admin
 
-- The `/admin` page in the frontend prompts for `ADMIN_TOKEN`, then shows orders, transactions, and product stock.
+- The `/admin` page in the frontend prompts for `ADMIN_TOKEN`, then shows orders, transactions, and product stock. Type the token in; do not set a `VITE_ADMIN_TOKEN` env var, since it would be published in the site's JavaScript.
 - `/api/admin/summary` returns the same data as JSON. Authenticate with either:
   - `X-Admin-Token: <token>` header, or
   - `?token=<token>` query param.
@@ -225,4 +226,5 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 ### Database
 
 - `supabase/migrations/0001_init.sql` — schema, RLS policies, `decrement_stock` function, realtime publication.
+- `supabase/migrations/0006_stock_reservations.sql` — stock holds: `reserve_order_stock`, `commit_order_stock`, `release_expired_reservations`.
 - `supabase/seed.sql` — initial BABYSITTER product.

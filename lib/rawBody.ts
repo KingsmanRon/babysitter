@@ -1,15 +1,19 @@
 import type { IncomingMessage } from "node:http";
 
-export async function readRawBody(req: IncomingMessage): Promise<Buffer> {
-  // Some Vercel runtimes pre-parse and expose `req.body`. If it's already a
-  // Buffer or string, use it; otherwise stream the request.
-  const maybeBody = (req as unknown as { body?: unknown }).body;
-  if (Buffer.isBuffer(maybeBody)) return maybeBody;
-  if (typeof maybeBody === "string") return Buffer.from(maybeBody, "utf8");
-
-  const chunks: Buffer[] = [];
-  for await (const chunk of req as AsyncIterable<Buffer | string>) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk);
-  }
-  return Buffer.concat(chunks);
+// Reads the exact request bytes for signature verification.
+//
+// Vercel's Node runtime buffers the body before the handler runs, then replays
+// it only through the `data`/`end` events (it ignores `config.api.bodyParser`).
+// Async iteration over `req` sees an already-drained stream and yields nothing,
+// and touching `req.body` hands back parsed JSON, not the signed bytes. So
+// listen for `data`/`end` directly, which works with or without the helpers.
+export function readRawBody(req: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer | string) => {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
 }

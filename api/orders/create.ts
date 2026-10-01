@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "items are required" });
   }
   for (const item of body.items) {
-    if (!item.productId || !item.quantity || item.quantity <= 0) {
+    if (!item.productId || !Number.isInteger(item.quantity) || item.quantity <= 0) {
       return res.status(400).json({ error: "invalid item" });
     }
   }
@@ -130,6 +130,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const db = supabaseAdmin();
+
+    // Hand back units held by checkouts that were abandoned, before checking stock.
+    const { error: releaseErr } = await db.rpc("release_expired_reservations");
+    if (releaseErr) log.warn("api.orders.create.release_expired_failed", { err: releaseErr.message });
 
     const productIds = body.items.map((i) => i.productId);
     const { data: products, error: productsErr } = await db
@@ -228,6 +232,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (itemsErr) {
       await db.from("orders").delete().eq("id", order.id);
       throw itemsErr;
+    }
+
+    // Hold the units for this buyer while they pay. The check above can race
+    // other buyers; this is the atomic, all-or-nothing step.
+    const { data: reserved, error: reserveErr } = await db.rpc("reserve_order_stock", {
+      p_order_id: order.id,
+    });
+    if (reserveErr || reserved !== true) {
+      await db.from("orders").delete().eq("id", order.id);
+      if (reserveErr) throw reserveErr;
+      log.info("api.orders.create.sold_out", { orderId: order.id });
+      return res.status(409).json({ error: "Sorry, that size just sold out. Pick another size." });
     }
 
     log.info("api.orders.create.ok", { orderId: order.id, orderNumber });

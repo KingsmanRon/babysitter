@@ -3,8 +3,8 @@ import { verifyYocoWebhook, handleYocoWebhook, YocoWebhookEvent } from "../../li
 import { readRawBody } from "../../lib/rawBody.js";
 import { log } from "../../lib/logger.js";
 
-// Disable Vercel's built-in JSON body parser so we can access the raw body
-// for HMAC signature verification.
+// Next.js-style hint; Vercel's plain Node runtime ignores it and still buffers
+// the body, which is why readRawBody reads the replayed data/end events.
 export const config = {
   api: {
     bodyParser: false,

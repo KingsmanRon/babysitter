@@ -27,10 +27,13 @@ export const env = {
     return required("SUPABASE_SERVICE_ROLE_KEY");
   },
   get PUBLIC_SITE_URL(): string {
-    return (
-      optional("PUBLIC_SITE_URL") ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5173")
-    );
+    // In production prefer the project's production domain: VERCEL_URL is the
+    // per-deployment URL, which Vercel Deployment Protection can put behind a
+    // login wall, stranding customers after they pay.
+    const host =
+      (process.env.VERCEL_ENV === "production" && process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
+      process.env.VERCEL_URL;
+    return optional("PUBLIC_SITE_URL") || (host ? `https://${host}` : "http://localhost:5173");
   },
 };
 

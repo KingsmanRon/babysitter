@@ -10,6 +10,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const db = supabaseAdmin();
+    // Put abandoned checkout holds back on sale before showing stock.
+    const { error: releaseErr } = await db.rpc("release_expired_reservations");
+    if (releaseErr) log.warn("api.products.release_expired_failed", { err: releaseErr.message });
+
     const { data, error } = await db
       .from("products")
       .select(
