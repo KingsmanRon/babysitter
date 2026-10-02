@@ -4,6 +4,7 @@ import { log } from "./logger.js";
 import { supabaseAdmin } from "./supabaseAdmin.js";
 import { YOCO_API_BASE } from "./yocoApi.js";
 import { CUSTOMER_COLUMNS, supersedeEarlierOrders } from "./supersede.js";
+import { sendOrderConfirmation } from "./confirmationEmail.js";
 
 const YOCO_CHECKOUT_URL = `${YOCO_API_BASE}/checkouts`;
 
@@ -620,6 +621,10 @@ export async function recordPaymentSucceeded(p: SucceededPayment): Promise<{ tra
   } catch (err) {
     log.error(`yoco.${p.source}.supersede_failed`, { orderId: p.orderId, err: (err as Error).message });
   }
+
+  // Confirmation email, once, on the transition to paid (webhook replays never
+  // get here). Never throws; a failure is recorded on the order for admin.
+  await sendOrderConfirmation(p.orderId);
 
   log.info(`yoco.${p.source}.paid`, { orderId: p.orderId, eventId: p.eventId, paymentId: p.paymentId });
   return { transitioned: true };

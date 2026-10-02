@@ -24,6 +24,9 @@ All server-only variables must be set in Vercel without the `VITE_` prefix. Anyt
 | `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only, bypasses RLS) |
 | `ADMIN_TOKEN` | Any random string used to authenticate `/admin` requests |
+| `RESEND_API_KEY` | Optional. API key from [resend.com](https://resend.com) for order confirmation emails. Without it nothing is emailed automatically (admin can still use "Email manually") |
+| `EMAIL_FROM` | Optional. Sender for confirmation emails, default `BABYSITTER <orders@babysitterbs.co.za>`; the domain must be verified in Resend |
+| `EMAIL_REPLY_TO` | Optional. Where customer replies go, default `babysitterbs9@gmail.com` |
 | `CRON_SECRET` | Optional. A password you make up (e.g. `openssl rand -hex 32`) that protects `/api/cron/reconcile-payments`. Vercel Cron sends it automatically as `Authorization: Bearer ...`. Without it the daily sweep is skipped (the endpoint answers 503); everything else works |
 | `PUBLIC_SITE_URL` | Where Yoco sends customers after paying, e.g. `https://yourdomain.co.za`. Set it in Production. Defaults to the project's production domain in production, `https://$VERCEL_URL` in previews, or `http://localhost:5173` in dev |
 
@@ -57,7 +60,7 @@ VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ## Supabase setup
 
 1. Create a new project at [supabase.com](https://supabase.com).
-2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied. `0007_payment_reconciliation.sql` adds the `expired` order status, enforces one row per payment id and backfills card brand / last 4 from stored payloads; apply it before deploying the reconciliation code. `0008_order_fulfilment.sql` adds fulfilment tracking (packed, out for delivery, delivered / ready for collection, collected, plus courier and tracking number); apply it before deploying the admin fulfilment controls. `0009_order_nudges.sql` adds WhatsApp reminder tracking (`nudge_count`, `last_nudged_at`) and superseded-order fields (`superseded_by`, `cancel_reason`); apply it before deploying the nudge feature.
+2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied. `0007_payment_reconciliation.sql` adds the `expired` order status, enforces one row per payment id and backfills card brand / last 4 from stored payloads; apply it before deploying the reconciliation code. `0008_order_fulfilment.sql` adds fulfilment tracking (packed, out for delivery, delivered / ready for collection, collected, plus courier and tracking number); apply it before deploying the admin fulfilment controls. `0010_order_emails.sql` adds confirmation email tracking; apply it before deploying the email feature. `0009_order_nudges.sql` adds WhatsApp reminder tracking (`nudge_count`, `last_nudged_at`) and superseded-order fields (`superseded_by`, `cancel_reason`); apply it before deploying the nudge feature.
 3. Run `/supabase/seed.sql` to insert the BABYSITTER product and the S'MILANO SAVED MY LIFE tee (R500, plus R100 when delivered; 200 units split 50 each across S, M, L and XL; its page is `/smilano`).
 4. In the Supabase dashboard, go to **Database -> Replication** and confirm the `products` table is part of the `supabase_realtime` publication. The migration does this automatically; this step is just a sanity check.
 5. Copy the project URL, the service role key, and the anon key into the Vercel env vars listed above (and into `.env.local` for dev).
@@ -155,6 +158,18 @@ A valid one returns `200` and marks the order paid; `--bad-signature` must retur
 - **Live stock counts**: the frontend subscribes to Supabase Realtime `UPDATE` events on the `products` table, so stock counts update live without polling.
 - **No card data is stored**. Only safe metadata (card brand, last 4 digits) from Yoco's payment method details is persisted.
 
+## Order confirmation emails
+
+When an order is marked paid (webhook or reconciliation), the customer gets a branded confirmation email: the S'MILANO banner (`public/email/thanks-smilano.jpg`), their items and sizes, the total, delivery or collection, and a **Track your order** button to `/track/<order id>`. Replies go to `EMAIL_REPLY_TO`. It's sent once, on the transition to paid; an email failure never affects the payment and is shown on the order in admin.
+
+In admin, each paid order shows the email status with **Send email / Resend** (through Resend) and **Email manually** (opens your own mail app with the plain-text version: the fallback when email sending isn't set up or is failing).
+
+Setup (once):
+1. Create a Resend account and add the domain `babysitterbs.co.za` (Domains → Add domain).
+2. Add the DNS records Resend shows (SPF/DKIM TXT records, plus MX for the bounce subdomain) at your DNS provider, and wait for Resend to show the domain as verified.
+3. Create an API key with sending access and set `RESEND_API_KEY` in Vercel (Production). Optionally set `EMAIL_FROM` / `EMAIL_REPLY_TO`. Redeploy.
+4. In admin, use **Send email** on one of your own paid orders to check it arrives.
+
 ## Order tracking (customers)
 
 Customers track orders at `/track` with their order number (`BS-…`, shown on the payment confirmation) plus the email or phone number they ordered with. The payment success page links straight to `/track/<order id>`. The page shows Order placed → Payment received → Packed → Out for delivery / Ready for collection → Delivered / Collected, driven by the fulfilment status set in admin, plus the courier and tracking number once entered. Unpaid orders get a "Complete payment" link. Wrong details and unknown order numbers get the same "couldn't find" answer.
@@ -248,6 +263,7 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 - `api/cron/reconcile-payments.ts` — payment reconciliation sweep (`CRON_SECRET`-gated).
 - `api/admin/summary.ts` — `GET` admin summary (token-gated).
 - `api/admin/orders/[id].ts` — `PATCH` an order's fulfilment step, courier and tracking number (token-gated, paid orders only).
+- `api/admin/orders/[id]/email.ts` — `POST { mode: "send" | "manual" }` (re)sends the confirmation email or returns its `mailto:` link (token-gated).
 - `api/admin/orders/[id]/nudge.ts` — `POST` records a WhatsApp reminder for a pending order and returns its `wa.me` link (token-gated).
 
 ### Server libs
@@ -266,6 +282,7 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 - `supabase/migrations/0007_payment_reconciliation.sql` — `expired` status, payment-id uniqueness, payment-method backfill.
 - `supabase/migrations/0008_order_fulfilment.sql` — fulfilment status, courier, tracking number, dispatched/delivered times.
 - `supabase/migrations/0009_order_nudges.sql` — reminder count/time, superseded order fields.
+- `supabase/migrations/0010_order_emails.sql` — confirmation email sent/failed/manual tracking.
 
 ### Scripts and tests
 

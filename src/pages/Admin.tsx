@@ -40,6 +40,9 @@ type AdminSummary = {
     // Only on pending_payment orders.
     nudge_phone_valid?: boolean;
     superseded_by_order?: string | null;
+    confirmation_email_sent_at?: string | null;
+    confirmation_email_error?: string | null;
+    confirmation_email_manual_at?: string | null;
     created_at: string;
   }>;
   transactions: Array<{
@@ -57,6 +60,7 @@ type AdminSummary = {
     failed_at: string | null;
     created_at: string;
   }>;
+  emailConfigured?: boolean;
   products: Array<{
     id: string;
     slug: string;
@@ -196,6 +200,7 @@ export default function Admin() {
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, TrackingDraft>>({});
   const [savingOrderId, setSavingOrderId] = useState<string | null>(null);
   const [nudgeState, setNudgeState] = useState<Record<string, { busy: boolean; error: string | null }>>({});
+  const [emailState, setEmailState] = useState<Record<string, { busy: "send" | "manual" | null; error: string | null }>>({});
 
   const load = async (t: string, filter: string = orderFilter) => {
     if (!t) return;
@@ -296,6 +301,37 @@ export default function Admin() {
       setError((err as Error).message);
     } finally {
       setSavingOrderId(null);
+    }
+  };
+
+  // Confirmation email: "send" goes out through the email service; "manual"
+  // opens the admin's own mail app with the plain-text version (fallback).
+  const confirmationEmail = async (orderId: string, mode: "send" | "manual") => {
+    setEmailState((prev) => ({ ...prev, [orderId]: { busy: mode, error: null } }));
+    try {
+      const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ mode }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      if (mode === "manual") window.location.href = body.mailto;
+      setData((prev) =>
+        prev && {
+          ...prev,
+          orders: prev.orders.map((o) =>
+            o.id !== orderId
+              ? o
+              : mode === "manual"
+                ? { ...o, confirmation_email_manual_at: body.manualAt }
+                : { ...o, confirmation_email_sent_at: body.sentAt, confirmation_email_error: null },
+          ),
+        },
+      );
+      setEmailState((prev) => ({ ...prev, [orderId]: { busy: null, error: null } }));
+    } catch (err) {
+      setEmailState((prev) => ({ ...prev, [orderId]: { busy: null, error: (err as Error).message } }));
     }
   };
 
@@ -736,6 +772,56 @@ export default function Admin() {
                                       {isCollection ? "Collected" : "Delivered"} {new Date(o.delivered_at).toLocaleString()}
                                     </div>
                                   )}
+                                  <div className="mt-2 pt-2 border-t border-gray-800 space-y-1.5">
+                                    <div className="text-gray-500 uppercase tracking-wide text-[11px]">Confirmation email</div>
+                                    {!o.customer_email ? (
+                                      <div className="text-amber-400">No email address</div>
+                                    ) : (
+                                      (() => {
+                                        const state = emailState[o.id];
+                                        const btn =
+                                          "px-2 py-1 rounded font-semibold disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300";
+                                        return (
+                                          <>
+                                            {o.confirmation_email_sent_at ? (
+                                              <div className="text-green-400">✓ Sent {timeAgo(o.confirmation_email_sent_at)}</div>
+                                            ) : o.confirmation_email_error ? (
+                                              <div className="text-red-400">Not sent: {o.confirmation_email_error}</div>
+                                            ) : (
+                                              <div className="text-gray-400">Not sent</div>
+                                            )}
+                                            <div className="flex flex-wrap gap-1">
+                                              <button
+                                                type="button"
+                                                disabled={!!state?.busy || !data.emailConfigured}
+                                                title={data.emailConfigured ? undefined : "Email sending isn't set up yet (RESEND_API_KEY)"}
+                                                onClick={() => confirmationEmail(o.id, "send")}
+                                                className={`${btn} bg-purple-600 hover:bg-purple-500`}
+                                              >
+                                                {state?.busy === "send" ? "Sending…" : o.confirmation_email_sent_at ? "Resend" : "Send email"}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                disabled={!!state?.busy}
+                                                onClick={() => confirmationEmail(o.id, "manual")}
+                                                className={`${btn} border border-gray-700 text-gray-200 hover:border-gray-500`}
+                                              >
+                                                {state?.busy === "manual" ? "Opening…" : "Email manually"}
+                                              </button>
+                                            </div>
+                                            {o.confirmation_email_manual_at && (
+                                              <div className="text-gray-500">Opened manually {timeAgo(o.confirmation_email_manual_at)}</div>
+                                            )}
+                                            {state?.error && (
+                                              <div role="alert" className="text-red-400">
+                                                {state.error}
+                                              </div>
+                                            )}
+                                          </>
+                                        );
+                                      })()
+                                    )}
+                                  </div>
                                 </div>
                               );
                             })()
