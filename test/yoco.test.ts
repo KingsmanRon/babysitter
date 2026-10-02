@@ -1,145 +1,18 @@
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
-import { createYocoCheckout, handleYocoWebhook, SoldOutError, type YocoWebhookEvent } from "../lib/yoco.js";
+import {
+  createYocoCheckout,
+  extractPaymentMethod,
+  handleYocoWebhook,
+  recordPaymentSucceeded,
+  SoldOutError,
+  type YocoWebhookEvent,
+} from "../lib/yoco.js";
 import { setSupabaseAdminForTests } from "../lib/supabaseAdmin.js";
+import { createFakeSupabase, pendingOrderState, type DbState } from "./fakeSupabase.js";
 import { readRawBody } from "../lib/rawBody.js";
 import { PassThrough } from "node:stream";
 import type { IncomingMessage } from "node:http";
-
-type Order = { id: string; status: string; metadata?: Record<string, unknown> } & Record<string, unknown>;
-type OrderItem = { order_id: string; product_id: string; size?: string | null; quantity: number };
-type PaymentTransaction = { id: string; order_id: string; provider_checkout_id: string | null } & Record<string, unknown>;
-
-type DbState = {
-  orders: Order[];
-  order_items: OrderItem[];
-  payment_transactions: PaymentTransaction[];
-  payment_webhook_events: Record<string, unknown>[];
-  decrementCalls: Array<{ productId: string; quantity: number; size: string | null }>;
-  failOrderUpdates?: number;
-  soldOut?: boolean;
-};
-
-class QueryBuilder {
-  private operation: "select" | "insert" | "update" | null = null;
-  private selected = "";
-  private payload: Record<string, unknown> | null = null;
-  private filters: Array<{ column: string; op: "eq" | "neq"; value: unknown }> = [];
-
-  constructor(private readonly state: DbState, private readonly table: string) {}
-
-  select(columns: string) {
-    this.operation = this.operation ?? "select";
-    this.selected = columns;
-    return this;
-  }
-
-  insert(payload: Record<string, unknown>) {
-    this.operation = "insert";
-    this.payload = payload;
-    return this.execute();
-  }
-
-  update(payload: Record<string, unknown>) {
-    this.operation = "update";
-    this.payload = payload;
-    return this;
-  }
-
-  eq(column: string, value: unknown) {
-    this.filters.push({ column, op: "eq", value });
-    return this;
-  }
-
-  neq(column: string, value: unknown) {
-    this.filters.push({ column, op: "neq", value });
-    return this;
-  }
-
-  maybeSingle() {
-    return this.execute(true);
-  }
-
-  single() {
-    return this.execute(true);
-  }
-
-  then<TResult1 = unknown, TResult2 = never>(
-    onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-  ) {
-    return this.execute().then(onfulfilled, onrejected);
-  }
-
-  private async execute(single = false) {
-    if (this.operation === "insert") {
-      if (this.table === "payment_webhook_events") {
-        const duplicate = this.state.payment_webhook_events.some(
-          (row) => row.provider_event_id === this.payload!.provider_event_id,
-        );
-        if (duplicate) return { data: null, error: { code: "23505", message: "duplicate key" } };
-        this.state.payment_webhook_events.push(this.payload!);
-      } else if (this.table === "payment_transactions") {
-        this.state.payment_transactions.push({ id: `tx-${this.state.payment_transactions.length + 1}`, ...(this.payload as Record<string, unknown>) } as PaymentTransaction);
-      }
-      return { data: null, error: null };
-    }
-
-    let rows = this.rows().filter((row) =>
-      this.filters.every((filter) =>
-        filter.op === "eq" ? row[filter.column] === filter.value : row[filter.column] !== filter.value,
-      ),
-    );
-
-    if (this.operation === "update") {
-      if (this.table === "orders" && this.state.failOrderUpdates) {
-        this.state.failOrderUpdates -= 1;
-        return { data: null, error: { code: "57014", message: "statement timeout" } };
-      }
-      rows.forEach((row) => Object.assign(row, this.payload));
-    }
-
-    const data = single ? (rows[0] ?? null) : rows.map((row) => this.project(row));
-    return { data, error: null };
-  }
-
-  private rows(): Record<string, unknown>[] {
-    if (this.table === "orders") return this.state.orders as unknown as Record<string, unknown>[];
-    if (this.table === "order_items") return this.state.order_items as unknown as Record<string, unknown>[];
-    if (this.table === "payment_transactions") return this.state.payment_transactions as unknown as Record<string, unknown>[];
-    if (this.table === "payment_webhook_events") return this.state.payment_webhook_events;
-    return [];
-  }
-
-  private project(row: Record<string, unknown>) {
-    if (!this.selected || this.selected === "*") return row;
-    return Object.fromEntries(
-      this.selected.split(",").map((column) => column.trim()).map((column) => [column, row[column]]),
-    );
-  }
-}
-
-function createFakeSupabase(state: DbState) {
-  return {
-    from(table: string) {
-      return new QueryBuilder(state, table);
-    },
-    async rpc(name: string, args: Record<string, unknown>) {
-      const orderId = args.p_order_id as string;
-      if (name === "commit_order_stock") {
-        const ok = !state.soldOut;
-        if (ok) {
-          for (const item of state.order_items.filter((i) => i.order_id === orderId)) {
-            state.decrementCalls.push({ productId: item.product_id, quantity: item.quantity, size: item.size ?? null });
-          }
-        }
-        return { data: ok, error: null };
-      }
-      if (name === "reserve_order_stock") return { data: !state.soldOut, error: null };
-      throw new Error(`unexpected rpc ${name}`);
-    },
-  };
-}
 
 function paymentSucceededEvent(id: string, createdDate?: string): YocoWebhookEvent {
   return {
@@ -182,8 +55,8 @@ test("duplicate payment.succeeded events decrement stock only for the paid trans
   setSupabaseAdminForTests(createFakeSupabase(state) as never);
 
   try {
-    await handleYocoWebhook(paymentSucceededEvent("event-1"), {}, true);
-    await handleYocoWebhook(paymentSucceededEvent("event-2"), {}, true);
+    await handleYocoWebhook(paymentSucceededEvent("event-1"), {});
+    await handleYocoWebhook(paymentSucceededEvent("event-2"), {});
   } finally {
     setSupabaseAdminForTests(null);
   }
@@ -204,7 +77,7 @@ test("payment.succeeded stores paid_at from event.createdDate", async () => {
   setSupabaseAdminForTests(createFakeSupabase(state) as never);
 
   try {
-    await handleYocoWebhook(paymentSucceededEvent("event-1", createdDate), {}, true);
+    await handleYocoWebhook(paymentSucceededEvent("event-1", createdDate), {});
   } finally {
     setSupabaseAdminForTests(null);
   }
@@ -224,7 +97,7 @@ test("payment.failed stores failed_at from event.createdDate", async () => {
   setSupabaseAdminForTests(createFakeSupabase(state) as never);
 
   try {
-    await handleYocoWebhook(paymentFailedEvent("event-1", createdDate), {}, true);
+    await handleYocoWebhook(paymentFailedEvent("event-1", createdDate), {});
   } finally {
     setSupabaseAdminForTests(null);
   }
@@ -250,7 +123,7 @@ test("missing or invalid createdDate falls back to the current timestamp without
       };
       setSupabaseAdminForTests(createFakeSupabase(state) as never);
 
-      await assert.doesNotReject(handleYocoWebhook(event, {}, true));
+      await assert.doesNotReject(handleYocoWebhook(event, {}));
       assert.equal(state.payment_transactions[0][expectedField], now.toISOString());
     }
   } finally {
@@ -259,25 +132,20 @@ test("missing or invalid createdDate falls back to the current timestamp without
   }
 });
 
-function pendingOrderState(): DbState {
-  return {
-    orders: [{ id: "order-1", status: "pending_payment" }],
-    order_items: [{ order_id: "order-1", product_id: "product-1", size: "M", quantity: 1 }],
-    payment_transactions: [{ id: "tx-1", order_id: "order-1", provider_checkout_id: "checkout-1", provider: "yoco" }],
-    payment_webhook_events: [],
-    decrementCalls: [],
-  };
-}
-
-test("a valid retry of an event first stored with a bad signature still marks the order paid", async () => {
+test("a verified delivery of an event that older code stored unverified still marks the order paid", async () => {
   const state = pendingOrderState();
+  // Row left by the previous handler, which persisted bad-signature deliveries.
+  state.payment_webhook_events.push({
+    provider: "yoco",
+    provider_event_id: "event-1",
+    event_type: "payment.succeeded",
+    signature_valid: false,
+    payload_json: { forged: true },
+  });
   setSupabaseAdminForTests(createFakeSupabase(state) as never);
 
   try {
-    await handleYocoWebhook(paymentSucceededEvent("event-1"), {}, false);
-    assert.equal(state.orders[0].status, "pending_payment");
-
-    const result = await handleYocoWebhook(paymentSucceededEvent("event-1"), {}, true);
+    const result = await handleYocoWebhook(paymentSucceededEvent("event-1"), {});
     assert.equal(result.duplicate, undefined);
   } finally {
     setSupabaseAdminForTests(null);
@@ -285,6 +153,7 @@ test("a valid retry of an event first stored with a bad signature still marks th
 
   assert.equal(state.orders[0].status, "paid");
   assert.equal(state.payment_webhook_events[0].signature_valid, true);
+  assert.equal((state.payment_webhook_events[0].payload_json as { id: string }).id, "event-1");
   assert.ok(state.payment_webhook_events[0].processed_at);
   assert.equal(state.decrementCalls.length, 1);
 });
@@ -294,8 +163,8 @@ test("replaying an already processed event is a no-op", async () => {
   setSupabaseAdminForTests(createFakeSupabase(state) as never);
 
   try {
-    await handleYocoWebhook(paymentSucceededEvent("event-1"), {}, true);
-    const replay = await handleYocoWebhook(paymentSucceededEvent("event-1"), {}, true);
+    await handleYocoWebhook(paymentSucceededEvent("event-1"), {});
+    const replay = await handleYocoWebhook(paymentSucceededEvent("event-1"), {});
     assert.equal(replay.duplicate, true);
   } finally {
     setSupabaseAdminForTests(null);
@@ -309,11 +178,11 @@ test("a failed paid transition throws so Yoco's retry can complete it", async ()
   setSupabaseAdminForTests(createFakeSupabase(state) as never);
 
   try {
-    await assert.rejects(handleYocoWebhook(paymentSucceededEvent("event-1"), {}, true));
+    await assert.rejects(handleYocoWebhook(paymentSucceededEvent("event-1"), {}));
     assert.equal(state.orders[0].status, "pending_payment");
     assert.equal(state.payment_webhook_events[0].processed_at, undefined);
 
-    await handleYocoWebhook(paymentSucceededEvent("event-1"), {}, true);
+    await handleYocoWebhook(paymentSucceededEvent("event-1"), {});
   } finally {
     setSupabaseAdminForTests(null);
   }
@@ -349,13 +218,13 @@ test("a paid order whose stock is gone is flagged for a refund", async () => {
   setSupabaseAdminForTests(createFakeSupabase(state) as never);
 
   try {
-    await handleYocoWebhook(paymentSucceededEvent("event-1"), {}, true);
+    await handleYocoWebhook(paymentSucceededEvent("event-1"), {});
   } finally {
     setSupabaseAdminForTests(null);
   }
 
   assert.equal(state.orders[0].status, "paid");
-  assert.deepEqual(state.orders[0].metadata?.stock_flags, [{ productId: "product-1", size: "M", quantity: 1 }]);
+  assert.deepEqual((state.orders[0].metadata as { stock_flags?: unknown } | undefined)?.stock_flags, [{ productId: "product-1", size: "M", quantity: 1 }]);
 });
 
 test("checkout refuses to start when the order's stock can no longer be held", async () => {
@@ -375,4 +244,138 @@ test("checkout refuses to start when the order's stock can no longer be held", a
     setSupabaseAdminForTests(null);
     delete process.env.YOCO_SECRET_KEY;
   }
+});
+
+// ── Idempotency ─────────────────────────────────────────────────
+
+function withSetup(state: DbState, fn: () => Promise<void>) {
+  setSupabaseAdminForTests(createFakeSupabase(state) as never);
+  return fn().finally(() => setSupabaseAdminForTests(null));
+}
+
+// Shape documented by Yoco for payment.succeeded.
+function documentedSucceededEvent(eventId: string, paymentId = "p_rEy7ezAYVoXSYJafPKwc6vRx"): YocoWebhookEvent {
+  return {
+    id: eventId,
+    type: "payment.succeeded",
+    createdDate: "2026-10-02T07:51:15.000Z",
+    payload: {
+      id: paymentId,
+      type: "payment",
+      status: "succeeded",
+      amount: 60000,
+      currency: "ZAR",
+      mode: "live",
+      metadata: { checkoutId: "checkout-1", orderId: "order-1", orderNumber: "BS-1" },
+      paymentMethodDetails: {
+        type: "card",
+        card: { expiryMonth: 11, expiryYear: 28, maskedCard: "************6972", scheme: "visa" },
+      },
+    },
+  };
+}
+
+test("the same payment under two different event ids is recorded once and fulfilled once", async () => {
+  const state = pendingOrderState();
+  await withSetup(state, async () => {
+    await handleYocoWebhook(documentedSucceededEvent("evt_a"), {});
+    await handleYocoWebhook(documentedSucceededEvent("evt_b"), {});
+  });
+
+  assert.equal(state.payment_transactions.length, 1);
+  assert.equal(state.payment_transactions[0].provider_payment_id, "p_rEy7ezAYVoXSYJafPKwc6vRx");
+  assert.equal(state.decrementCalls.length, 1);
+  assert.equal(state.payment_webhook_events.length, 2);
+});
+
+test("a payment without a checkout id updates the order's checkout row instead of adding a second row", async () => {
+  const state = pendingOrderState();
+  const event = documentedSucceededEvent("evt_a");
+  delete event.payload.metadata!.checkoutId;
+  await withSetup(state, () => handleYocoWebhook(event, {}).then(() => undefined));
+
+  assert.equal(state.payment_transactions.length, 1);
+  assert.equal(state.payment_transactions[0].id, "tx-1");
+  assert.ok(state.payment_transactions[0].paid_at);
+  assert.equal(state.orders[0].status, "paid");
+});
+
+test("a decline delivered after the payment succeeded leaves the paid row and order alone", async () => {
+  const state = pendingOrderState();
+  const declined: YocoWebhookEvent = {
+    id: "evt_declined",
+    type: "payment.failed",
+    payload: { id: "p_declined", status: "failed", amount: 60000, currency: "ZAR", metadata: { checkoutId: "checkout-1", orderId: "order-1" } },
+  };
+  await withSetup(state, async () => {
+    await handleYocoWebhook(documentedSucceededEvent("evt_ok"), {});
+    await handleYocoWebhook(declined, {});
+  });
+
+  assert.equal(state.orders[0].status, "paid");
+  assert.equal(state.payment_transactions[0].provider_status, "succeeded");
+  assert.equal(state.payment_transactions[0].failed_at, null);
+});
+
+test("a decline on an open checkout is recorded and marks the order payment_failed", async () => {
+  const state = pendingOrderState();
+  const declined: YocoWebhookEvent = {
+    id: "evt_declined",
+    type: "payment.failed",
+    createdDate: "2026-10-02T08:00:00.000Z",
+    payload: { id: "p_declined", status: "failed", amount: 60000, currency: "ZAR", metadata: { checkoutId: "checkout-1", orderId: "order-1" } },
+  };
+  await withSetup(state, () => handleYocoWebhook(declined, {}).then(() => undefined));
+
+  assert.equal(state.orders[0].status, "payment_failed");
+  assert.equal(state.payment_transactions[0].provider_status, "failed");
+  assert.equal(state.payment_transactions[0].failed_at, "2026-10-02T08:00:00.000Z");
+});
+
+// ── Payment method ─────────────────────────────────────────────
+
+test("card brand and last 4 are stored from Yoco's documented payload", async () => {
+  const state = pendingOrderState();
+  await withSetup(state, () => handleYocoWebhook(documentedSucceededEvent("evt_a"), {}).then(() => undefined));
+
+  const tx = state.payment_transactions[0];
+  assert.equal(tx.payment_method_type, "card");
+  assert.equal(tx.payment_method_brand, "visa");
+  assert.equal(tx.payment_method_last4, "6972");
+});
+
+test("extractPaymentMethod handles flat card fields and card-less methods", () => {
+  assert.deepEqual(extractPaymentMethod({ type: "card", scheme: "mastercard", maskedCard: "5200 **** **** 0007" }), {
+    type: "card",
+    brand: "mastercard",
+    last4: "0007",
+  });
+  assert.deepEqual(extractPaymentMethod({ type: "instant_eft" }), { type: "instant_eft", brand: null, last4: null });
+  assert.deepEqual(extractPaymentMethod(undefined), { type: null, brand: null, last4: null });
+});
+
+test("a later write without card details never blanks the stored card", async () => {
+  const state = pendingOrderState();
+  await withSetup(state, async () => {
+    await handleYocoWebhook(documentedSucceededEvent("evt_a"), {});
+    await recordPaymentSucceeded({
+      orderId: "order-1",
+      checkoutId: "checkout-1",
+      paymentId: "p_rEy7ezAYVoXSYJafPKwc6vRx",
+      eventId: null,
+      amountCents: 60000,
+      currency: "ZAR",
+      mode: null,
+      method: null,
+      paidAt: new Date().toISOString(),
+      raw: { reconciledAt: "now" },
+      source: "reconcile",
+    });
+  });
+
+  const tx = state.payment_transactions[0];
+  assert.equal(tx.payment_method_brand, "visa");
+  assert.equal(tx.payment_method_last4, "6972");
+  assert.equal(tx.paid_at, "2026-10-02T07:51:15.000Z");
+  assert.equal(state.decrementCalls.length, 1);
 });

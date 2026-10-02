@@ -24,6 +24,7 @@ All server-only variables must be set in Vercel without the `VITE_` prefix. Anyt
 | `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only, bypasses RLS) |
 | `ADMIN_TOKEN` | Any random string used to authenticate `/admin` requests |
+| `CRON_SECRET` | Optional. A password you make up (e.g. `openssl rand -hex 32`) that protects `/api/cron/reconcile-payments`. Vercel Cron sends it automatically as `Authorization: Bearer ...`. Without it the daily sweep is skipped (the endpoint answers 503); everything else works |
 | `PUBLIC_SITE_URL` | Where Yoco sends customers after paying, e.g. `https://yourdomain.co.za`. Set it in Production. Defaults to the project's production domain in production, `https://$VERCEL_URL` in previews, or `http://localhost:5173` in dev |
 
 ### Client-safe (exposed to the browser)
@@ -56,7 +57,7 @@ VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ## Supabase setup
 
 1. Create a new project at [supabase.com](https://supabase.com).
-2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied.
+2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied. `0007_payment_reconciliation.sql` adds the `expired` order status, enforces one row per payment id and backfills card brand / last 4 from stored payloads; apply it before deploying the reconciliation code.
 3. Run `/supabase/seed.sql` to insert the BABYSITTER product and the S'MILANO SAVED MY LIFE tee (R500, plus R100 when delivered; 200 units split 50 each across S, M, L and XL; its page is `/smilano`).
 4. In the Supabase dashboard, go to **Database -> Replication** and confirm the `products` table is part of the `supabase_realtime` publication. The migration does this automatically; this step is just a sanity check.
 5. Copy the project URL, the service role key, and the anon key into the Vercel env vars listed above (and into `.env.local` for dev).
@@ -89,13 +90,31 @@ Do **not** use plain `npm run dev` for end-to-end testing. That runs Vite alone 
 
 ## Yoco webhook registration
 
-The webhook must be registered against a publicly reachable URL, so you need at least one deploy first.
+There must be exactly **one** Yoco webhook subscription per mode pointing at the site. Each subscription signs with its own secret, so a second one shows up as a duplicate delivery of every event that fails signature checks (401) and is retried by Yoco.
 
-1. Deploy to Vercel so `/api/webhooks/yoco` exists at a public URL (e.g. `https://<your-vercel-url>/api/webhooks/yoco`).
-2. In the Yoco dashboard, go to **Developers -> Webhooks -> Add endpoint**.
-3. Subscribe to events: `payment.succeeded` and `payment.failed`.
-4. Yoco returns a signing secret (`whsec_...`). Set `YOCO_WEBHOOK_SECRET` in Vercel env vars and redeploy (env changes only take effect on new deployments).
-5. Use the **Send test event** button in the Yoco dashboard to verify the endpoint returns `200`.
+The scripts below call the Yoco API with `YOCO_SECRET_KEY` (use `sk_live_...` for production subscriptions, `sk_test_...` for test ones). They do not read `.env.local`; pass the variables inline.
+
+```bash
+# Read-only: list subscriptions, warning when more than one targets the same URL
+YOCO_SECRET_KEY=sk_live_... npm run yoco:webhooks:list
+
+# Register, but only if nothing already points at the URL (safe to re-run)
+YOCO_SECRET_KEY=sk_live_... PUBLIC_SITE_URL=https://babysitterbs.co.za npm run yoco:webhook:register
+
+# Delete one subscription by id: shows the target, acts only with --yes
+YOCO_SECRET_KEY=sk_live_... npm run yoco:webhook:delete -- <subscription-id> --yes
+```
+
+Registration prints the signing secret once. Set it as `YOCO_WEBHOOK_SECRET` in Vercel and redeploy (env changes only take effect on new deployments). Nothing registers webhooks automatically on deploy.
+
+To exercise the endpoint with a correctly signed event (locally under `vercel dev`, or against a preview):
+
+```bash
+YOCO_WEBHOOK_SECRET=whsec_... npm run yoco:webhook:send-test -- \
+  --order <order id> --checkout <provider_checkout_id> [--url http://localhost:3000/api/webhooks/yoco] [--bad-signature]
+```
+
+A valid one returns `200` and marks the order paid; `--bad-signature` must return `401` and write nothing.
 
 ## End-to-end test flow
 
@@ -124,8 +143,10 @@ The webhook must be registered against a publicly reachable URL, so you need at 
 
 ## Architecture notes
 
-- **Source of truth for payment state is the webhook**, not the success-page redirect. The redirect URL is advisory — users can close the tab, lose network, or hit back. The webhook is the authoritative write.
-- **Idempotency on webhooks**: `payment_webhook_events` has a unique constraint on `(provider, provider_event_id)`, so duplicate deliveries from Yoco are dropped at the database level.
+- **Payment state comes from Yoco, not the success-page redirect.** The redirect URL is advisory — users can close the tab, lose network, or hit back. A verified webhook is the normal write; reconciliation (below) covers webhooks that never arrive.
+- **Webhooks are verified before anything else.** The signature is checked over the raw request bytes (Standard Webhooks scheme, 3-minute timestamp tolerance). Unverified deliveries get `401` and are neither parsed, stored nor logged beyond the failure reason.
+- **Idempotency**: `payment_webhook_events` is unique on `(provider, provider_event_id)`, and `payment_transactions` on checkout id, event id and payment id, so replays update one row. Only the call that moves the order to `paid` commits stock.
+- **Reconciliation**: `lib/reconcile.ts` asks Yoco (`GET /api/checkouts/{id}`, read-only) about orders still `pending_payment` or `payment_failed`, starting 2 minutes after their checkout was created. A completed checkout marks the order paid; an expired/cancelled one, or one still unpaid after 60 minutes, marks the order (and its transaction) `expired` and releases its stock. A later successful payment still moves it to `paid`. It runs for the order a buyer is watching (`GET /api/orders/:id`, at most every 30 s per checkout) and as a sweep from `/api/cron/reconcile-payments` (daily via Vercel Cron, the most a Hobby plan allows; on Pro, change the schedule in `vercel.json` to `*/10 * * * *`, or point any scheduler at it with the `CRON_SECRET` bearer token). Add `?dryRun=1` to see what a sweep would change.
 - **Idempotency on checkout creation**: re-clicking Pay on the same order returns the existing Yoco checkout URL instead of creating a duplicate session.
 - **Stock is held while the buyer pays**: creating an order calls `reserve_order_stock`, which takes every item out of stock atomically (all or nothing) and holds it for 30 minutes. If the last unit is gone, the buyer gets a 409 "sold out" before reaching Yoco, so a drop can't take more payments than it has units.
 - **Abandoned holds come back**: `release_expired_reservations` puts unpaid, expired holds back on sale. The API runs it whenever products are listed or an order is created, so no cron job is needed.
@@ -213,12 +234,15 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 - `api/orders/create.ts` — `POST` create a draft order.
 - `api/orders/[id].ts` — `GET` order status (used by status pages).
 - `api/payments/yoco/create-checkout.ts` — `POST` create a Yoco checkout session.
-- `api/webhooks/yoco.ts` — `POST` raw-body webhook receiver.
+- `api/webhooks/yoco.ts` — `POST` raw-body webhook receiver (the only Yoco webhook route).
+- `api/cron/reconcile-payments.ts` — payment reconciliation sweep (`CRON_SECRET`-gated).
 - `api/admin/summary.ts` — `GET` admin summary (token-gated).
 
 ### Server libs
 
-- `lib/yoco.ts` — `createYocoCheckout`, `verifyYocoWebhook`, `handleYocoWebhook`.
+- `lib/yoco.ts` — `createYocoCheckout`, `verifyYocoWebhook`, `handleYocoWebhook`, `recordPaymentSucceeded`.
+- `lib/yocoApi.ts` — Yoco webhook subscription and checkout lookup calls.
+- `lib/reconcile.ts` — reconciles open orders against Yoco and expires stale ones.
 - `lib/supabaseAdmin.ts` — service-role Supabase client.
 - `lib/rawBody.ts` — raw body reader for the webhook (needed for signature verification).
 - `lib/env.ts` — typed env access with helpful error messages.
@@ -227,4 +251,10 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 
 - `supabase/migrations/0001_init.sql` — schema, RLS policies, `decrement_stock` function, realtime publication.
 - `supabase/migrations/0006_stock_reservations.sql` — stock holds: `reserve_order_stock`, `commit_order_stock`, `release_expired_reservations`.
+- `supabase/migrations/0007_payment_reconciliation.sql` — `expired` status, payment-id uniqueness, payment-method backfill.
+
+### Scripts and tests
+
+- `scripts/yoco-webhooks-list.ts`, `scripts/yoco-webhook-register.ts`, `scripts/yoco-webhook-delete.ts`, `scripts/send-test-webhook.ts` — see Yoco webhook registration.
+- `npm run test:yoco` — signature verification, webhook idempotency, reconciliation and route tests.
 - `supabase/seed.sql` — initial BABYSITTER product.

@@ -26,7 +26,8 @@ export type OrderStatus =
   | "paid"
   | "payment_failed"
   | "cancelled"
-  | "refunded";
+  | "refunded"
+  | "expired";
 
 export type Order = {
   id: string;
@@ -61,7 +62,9 @@ async function asJson<T>(res: Response): Promise<T> {
 }
 
 export async function fetchProducts(): Promise<Product[]> {
-  const res = await fetch("/api/products", { cache: "no-store" });
+  // Default cache mode: "no-store" would send Cache-Control: no-cache and
+  // skip the short CDN cache /api/products sets (max-age=0 still revalidates).
+  const res = await fetch("/api/products");
   const data = await asJson<{ products: Product[] }>(res);
   return data.products;
 }

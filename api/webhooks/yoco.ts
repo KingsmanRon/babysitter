@@ -25,12 +25,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "Invalid body" });
   }
 
+  // Verify before reading anything from the body. An unverified delivery is
+  // rejected without being parsed, stored or logged: its contents (event id,
+  // type, order) are attacker-controlled until the signature checks out.
   const verification = verifyYocoWebhook(req.headers, rawBody);
-  const signatureValid = verification.ok === true;
-  if (!signatureValid) {
-    log.warn("webhook.yoco.signature_invalid", { reason: (verification as { ok: false; reason: string }).reason });
-    // We still try to persist the event (with signature_valid=false) for audit,
-    // but we respond 401 so Yoco retries if applicable.
+  if (!verification.ok) {
+    const webhookId = req.headers["webhook-id"];
+    log.warn("webhook.yoco.signature_invalid", {
+      reason: verification.reason,
+      // Header only, for correlating deliveries in Yoco's dashboard.
+      webhookId: typeof webhookId === "string" ? webhookId.slice(0, 64) : null,
+    });
+    return res.status(401).json({ error: "Invalid signature" });
   }
 
   let event: YocoWebhookEvent;
@@ -39,12 +45,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch {
     return res.status(400).json({ error: "Invalid JSON" });
   }
-  if (!event.id || !event.type) {
+  if (!event?.id || !event.type || !event.payload) {
     return res.status(400).json({ error: "Malformed event" });
   }
 
   try {
-    await handleYocoWebhook(event, req.headers, signatureValid);
+    await handleYocoWebhook(event, req.headers);
   } catch (err) {
     log.error("webhook.yoco.handler_error", {
       eventId: event.id,
@@ -54,8 +60,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "Webhook handler failed" });
   }
 
-  if (!signatureValid) {
-    return res.status(401).json({ error: "Invalid signature" });
-  }
   return res.status(200).json({ received: true });
 }

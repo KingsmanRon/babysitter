@@ -8,8 +8,13 @@
     "dev:vercel": "vercel dev",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "test:yoco": "rm -rf .tmp/yoco-test && tsc -p tsconfig.test.json && node --test .tmp/yoco-test/test/yoco.test.js"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.scripts.json --noEmit",
+    "test:yoco": "rm -rf .tmp/yoco-test && tsc -p tsconfig.test.json && node --test '.tmp/yoco-test/test/*.test.js'",
+    "build:scripts": "rm -rf .tmp/scripts && tsc -p tsconfig.scripts.json",
+    "yoco:webhooks:list": "npm run -s build:scripts && node .tmp/scripts/scripts/yoco-webhooks-list.js",
+    "yoco:webhook:delete": "npm run -s build:scripts && node .tmp/scripts/scripts/yoco-webhook-delete.js",
+    "yoco:webhook:register": "npm run -s build:scripts && node .tmp/scripts/scripts/yoco-webhook-register.js",
+    "yoco:webhook:send-test": "npm run -s build:scripts && node .tmp/scripts/scripts/send-test-webhook.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
