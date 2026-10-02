@@ -22,10 +22,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq("is_active", true)
       .order("created_at", { ascending: true });
     if (error) throw error;
-    res.setHeader("Cache-Control", "no-store");
+    // Let Vercel's CDN absorb traffic spikes: one function call per region
+    // every ~10s instead of one per visitor. Browsers always revalidate, and
+    // live stock counts arrive over Supabase Realtime regardless.
+    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=10, stale-while-revalidate=30");
     return res.status(200).json({ products: data || [] });
   } catch (err) {
     log.error("api.products.error", { err: (err as Error).message });
+    res.setHeader("Cache-Control", "no-store");
     return res.status(500).json({ error: "Failed to load products" });
   }
 }

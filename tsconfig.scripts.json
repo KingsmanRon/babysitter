@@ -2,8 +2,8 @@
   "extends": "./tsconfig.server.json",
   "compilerOptions": {
     "noEmit": false,
-    "outDir": ".tmp/yoco-test",
+    "outDir": ".tmp/scripts",
     "rootDir": "."
   },
-  "include": ["api", "lib", "test"]
+  "include": ["lib", "scripts"]
 }

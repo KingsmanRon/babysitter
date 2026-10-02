@@ -39,6 +39,7 @@ type AdminSummary = {
     provider_status: string | null;
     amount_cents: number;
     processing_mode: string | null;
+    payment_method_type: string | null;
     payment_method_brand: string | null;
     payment_method_last4: string | null;
     paid_at: string | null;
@@ -351,7 +352,7 @@ export default function Admin() {
                             className={
                               o.status === "paid"
                                 ? "text-green-400"
-                                : o.status === "payment_failed"
+                                : o.status === "payment_failed" || o.status === "expired"
                                   ? "text-red-400"
                                   : "text-gray-300"
                             }
@@ -426,7 +427,7 @@ export default function Admin() {
                         <td className="p-3">
                           {t.payment_method_brand
                             ? `${t.payment_method_brand}${t.payment_method_last4 ? ` ···${t.payment_method_last4}` : ""}`
-                            : "—"}
+                            : t.payment_method_type || "—"}
                         </td>
                         <td className="p-3">{t.processing_mode || "—"}</td>
                         <td className="p-3 text-xs text-gray-400">

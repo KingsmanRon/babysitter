@@ -1,6 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { supabaseAdmin } from "../../lib/supabaseAdmin.js";
 import { log } from "../../lib/logger.js";
+import { reconcileOrder } from "../../lib/reconcile.js";
+
+const SELECT_ORDER = "id, order_number, status, amount_cents, currency, created_at, updated_at";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
@@ -14,13 +17,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const db = supabaseAdmin();
-    const { data: order, error } = await db
-      .from("orders")
-      .select("id, order_number, status, amount_cents, currency, created_at, updated_at")
-      .eq("id", id)
-      .maybeSingle();
+    const { data: found, error } = await db.from("orders").select(SELECT_ORDER).eq("id", id).maybeSingle();
     if (error) throw error;
-    if (!order) return res.status(404).json({ error: "Order not found" });
+    if (!found) return res.status(404).json({ error: "Order not found" });
+    let order = found;
+
+    // The status page polls this. If the webhook hasn't landed a couple of
+    // minutes after checkout, ask Yoco directly (throttled per checkout).
+    if (order.status === "pending_payment" || order.status === "payment_failed") {
+      try {
+        const outcome = await reconcileOrder(id);
+        if (outcome === "paid" || outcome === "expired") {
+          const { data: fresh } = await db.from("orders").select(SELECT_ORDER).eq("id", id).maybeSingle();
+          if (fresh) order = fresh;
+        }
+      } catch (err) {
+        log.warn("api.orders.read.reconcile_failed", { orderId: id, err: (err as Error).message });
+      }
+    }
 
     const { data: items } = await db
       .from("order_items")

@@ -36,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? await db
           .from("payment_transactions")
           .select(
-            "id, order_id, provider_checkout_id, provider_payment_id, provider_status, amount_cents, currency, processing_mode, payment_method_brand, payment_method_last4, paid_at, failed_at, created_at",
+            "id, order_id, provider_checkout_id, provider_payment_id, provider_status, amount_cents, currency, processing_mode, payment_method_type, payment_method_brand, payment_method_last4, paid_at, failed_at, created_at",
           )
           .in("order_id", orderIds)
           .order("created_at", { ascending: false })
