@@ -11,13 +11,12 @@ import { getYocoCheckout, YocoApiError, type YocoCheckout } from "./yocoApi.js";
 // Give the webhook a head start before asking Yoco ourselves.
 export const RECONCILE_MIN_AGE_MINUTES = 2;
 // An order whose checkout hasn't completed this long after it was created is
-// expired: the order becomes "cancelled" (an existing status, so no schema
-// change) and its transaction "expired". That is twice the 30-minute stock
-// hold, so the units are already back on sale by then; a buyer who still pays
-// later is caught by the webhook (or the next pass), which moves the order to
-// paid.
+// expired (order "expired", needs migration 0008; transaction "expired").
+// That is twice the 30-minute stock hold, so the units are already back on
+// sale by then; a buyer who still pays later is caught by the webhook (or the
+// next pass), which moves the order to paid.
 export const PENDING_EXPIRY_MINUTES = 60;
-export const EXPIRED_ORDER_STATUS = "cancelled";
+export const EXPIRED_ORDER_STATUS = "expired";
 // Ask Yoco about the same checkout at most this often (status page polls).
 // Kept in memory per server instance, so it needs no database column.
 export const RECONCILE_THROTTLE_SECONDS = 30;

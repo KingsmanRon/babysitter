@@ -194,13 +194,13 @@ export async function createYocoCheckout(orderId: string): Promise<{ redirectUrl
     throw new Error("Failed to save payment transaction");
   }
 
-  // A buyer retrying after a decline or an expired (cancelled) checkout
-  // reopens the order, so reconciliation keeps watching it.
+  // A buyer retrying after a decline or an expired checkout reopens the
+  // order, so reconciliation keeps watching it.
   const { error: orderUpdateErr } = await db
     .from("orders")
     .update({ status: "pending_payment" })
     .eq("id", order.id)
-    .in("status", ["draft", "pending_payment", "payment_failed", "cancelled"]);
+    .in("status", ["draft", "pending_payment", "payment_failed", "expired", "cancelled"]);
   if (orderUpdateErr) {
     log.warn("yoco.create_checkout.order_status_update_failed", {
       orderId,
@@ -689,7 +689,7 @@ async function processPaymentFailed(event: YocoWebhookEvent) {
     log.error("yoco.webhook.failed_transaction_write_failed", { orderId, checkoutId, eventId: event.id, err: txErr });
   }
 
-  // Atomic: never regresses a paid (or cancelled) order.
+  // Atomic: never regresses a paid, expired or cancelled order.
   await db
     .from("orders")
     .update({ status: "payment_failed" })

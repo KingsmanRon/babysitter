@@ -11,6 +11,7 @@ async function summary(url: string) {
       { id: "o-pending", status: "pending_payment", created_at: "2026-10-02T07:01:00Z" },
       { id: "o-draft", status: "draft", created_at: "2026-10-02T07:02:00Z" },
       { id: "o-cancelled", status: "cancelled", created_at: "2026-10-02T07:03:00Z" },
+      { id: "o-expired", status: "expired", created_at: "2026-10-02T07:04:00Z" },
     ],
     order_items: [],
     payment_transactions: [
@@ -53,11 +54,14 @@ test("admin summary filters orders, and their transactions, by status group", as
 
   const pending = await summary("/api/admin/summary?status=pending");
   assert.deepEqual(pending.body!.orders.map((o) => o.id).sort(), ["o-draft", "o-pending"]);
+
+  const expired = await summary("/api/admin/summary?status=expired");
+  assert.deepEqual(expired.body!.orders.map((o) => o.id), ["o-expired"]);
 });
 
 test("no or unknown filter returns every order", async () => {
   for (const url of ["/api/admin/summary", "/api/admin/summary?status=bogus"]) {
     const res = await summary(url);
-    assert.equal(res.body!.orders.length, 4);
+    assert.equal(res.body!.orders.length, 5);
   }
 });

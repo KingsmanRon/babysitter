@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Check, Loader2 } from "lucide-react";
 import { fetchOrder, formatZarFromCents, Order, OrderItem } from "../lib/api";
 
-const TERMINAL_STATES = new Set(["paid", "payment_failed", "cancelled", "refunded"]);
+const TERMINAL_STATES = new Set(["paid", "payment_failed", "cancelled", "refunded", "expired"]);
 
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
@@ -37,7 +37,8 @@ export default function PaymentSuccess() {
   }, [orderId]);
 
   const isPaid = order?.status === "paid";
-  const waiting = !isPaid && order?.status !== "payment_failed" && order?.status !== "cancelled" && !error;
+  const waiting = !isPaid && order?.status !== "payment_failed" && order?.status !== "cancelled" &&
+    order?.status !== "expired" && !error;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black flex items-center justify-center p-6">

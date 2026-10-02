@@ -7,6 +7,7 @@ const STATUS_FILTERS: Record<string, string[]> = {
   paid: ["paid"],
   pending: ["draft", "pending_payment"],
   failed: ["payment_failed"],
+  expired: ["expired"],
   cancelled: ["cancelled"],
   refunded: ["refunded"],
 };

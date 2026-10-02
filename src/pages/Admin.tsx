@@ -71,7 +71,8 @@ const ORDER_FILTERS = [
   { key: "paid", label: "Paid" },
   { key: "pending", label: "Pending" },
   { key: "failed", label: "Failed" },
-  { key: "cancelled", label: "Cancelled / expired" },
+  { key: "expired", label: "Expired" },
+  { key: "cancelled", label: "Cancelled" },
   { key: "refunded", label: "Refunded" },
 ] as const;
 type OrderFilter = (typeof ORDER_FILTERS)[number]["key"];
@@ -387,6 +388,8 @@ export default function Admin() {
                                 ? "text-green-400"
                                 : o.status === "payment_failed"
                                   ? "text-red-400"
+                                  : o.status === "expired"
+                                    ? "text-amber-400"
                                   : "text-gray-300"
                             }
                           >
