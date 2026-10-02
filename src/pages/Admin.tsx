@@ -34,6 +34,12 @@ type AdminSummary = {
     tracking_number?: string | null;
     dispatched_at?: string | null;
     delivered_at?: string | null;
+    items?: Array<{ product_name: string; size: string | null; quantity: number }>;
+    nudge_count?: number;
+    last_nudged_at?: string | null;
+    // Only on pending_payment orders.
+    nudge_phone_valid?: boolean;
+    superseded_by_order?: string | null;
     created_at: string;
   }>;
   transactions: Array<{
@@ -101,6 +107,40 @@ const COLLECTION_STEPS = ["unfulfilled", "packed", "ready_for_collection", "coll
 
 type TrackingDraft = { courier: string; tracking_number: string };
 
+const PENDING_FILTER = "status=pending";
+
+// "M ×2 · L ×1" totals across paid orders, for packing.
+function paidSizeTotals(orders: AdminSummary["orders"]): string {
+  const totals = new Map<string, number>();
+  for (const o of orders) {
+    if (o.status !== "paid") continue;
+    for (const item of o.items ?? []) {
+      const size = item.size || "No size";
+      totals.set(size, (totals.get(size) ?? 0) + item.quantity);
+    }
+  }
+  const order = ["XS", "S", "M", "L", "XL", "XXL", "2XL", "3XL"];
+  return [...totals.entries()]
+    .sort(([a], [b]) => {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    })
+    .map(([size, qty]) => `${size} ×${qty}`)
+    .join(" · ");
+}
+const MAX_NUDGES = 2;
+
+function timeAgo(iso: string): string {
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
 const saleDraftFromProduct = (product: AdminProduct): ProductSaleDraft => ({
   compare_at_price_cents: product.compare_at_price_cents?.toString() ?? "",
   sale_price_cents: product.sale_price_cents?.toString() ?? "",
@@ -142,6 +182,7 @@ export default function Admin() {
   const [orderFilter, setOrderFilter] = useState("");
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, TrackingDraft>>({});
   const [savingOrderId, setSavingOrderId] = useState<string | null>(null);
+  const [nudgeState, setNudgeState] = useState<Record<string, { busy: boolean; error: string | null }>>({});
 
   const load = async (t: string, filter: string = orderFilter) => {
     if (!t) return;
@@ -242,6 +283,44 @@ export default function Admin() {
       setError((err as Error).message);
     } finally {
       setSavingOrderId(null);
+    }
+  };
+
+  const sendNudge = async (orderId: string) => {
+    // Open the tab synchronously, in the click, so pop-up blockers allow it;
+    // it is pointed at WhatsApp once the server has recorded the reminder.
+    const win = window.open("", "_blank");
+    if (!win) {
+      setNudgeState((prev) => ({
+        ...prev,
+        [orderId]: { busy: false, error: "Pop-up blocked. Allow pop-ups for this site and try again." },
+      }));
+      return;
+    }
+    win.opener = null;
+    setNudgeState((prev) => ({ ...prev, [orderId]: { busy: true, error: null } }));
+    try {
+      const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/nudge`, {
+        method: "POST",
+        headers: { "x-admin-token": token },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || typeof body.url !== "string") {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      win.location.href = body.url;
+      setData((prev) =>
+        prev && {
+          ...prev,
+          orders: prev.orders.map((o) =>
+            o.id === orderId ? { ...o, nudge_count: body.nudgeCount, last_nudged_at: body.lastNudgedAt } : o,
+          ),
+        },
+      );
+      setNudgeState((prev) => ({ ...prev, [orderId]: { busy: false, error: null } }));
+    } catch (err) {
+      win.close();
+      setNudgeState((prev) => ({ ...prev, [orderId]: { busy: false, error: (err as Error).message } }));
     }
   };
 
@@ -423,6 +502,12 @@ export default function Admin() {
                   ))}
                 </div>
               ))}
+              {paidSizeTotals(data.orders) && (
+                <p className="text-sm text-gray-400">
+                  <span className="text-gray-500">Paid sizes in this list:</span>{" "}
+                  <span className="font-semibold text-white">{paidSizeTotals(data.orders)}</span>
+                </p>
+              )}
               <div className="overflow-x-auto rounded-xl border border-gray-800">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-900 text-gray-400">
@@ -430,7 +515,9 @@ export default function Admin() {
                       <th className="text-left p-3">Order #</th>
                       <th className="text-left p-3">Status</th>
                       <th className="text-right p-3">Amount</th>
+                      <th className="text-left p-3">Items</th>
                       <th className="text-left p-3">Customer</th>
+                      {orderFilter === PENDING_FILTER && <th className="text-left p-3">Nudge</th>}
                       <th className="text-left p-3">Deliver to</th>
                       <th className="text-left p-3">Fulfilment</th>
                       <th className="text-left p-3">Created</th>
@@ -459,10 +546,71 @@ export default function Admin() {
                           ) : null}
                         </td>
                         <td className="p-3 text-right">{formatZarFromCents(o.amount_cents)}</td>
+                        <td className="p-3 text-xs align-top">
+                          {o.items?.length ? (
+                            o.items.map((item, i) => (
+                              <div key={i} className="whitespace-nowrap">
+                                <span className="inline-block min-w-[2.25rem] mr-1.5 px-1.5 py-0.5 rounded bg-purple-600/20 text-purple-300 font-bold text-center">
+                                  {item.size || "—"}
+                                </span>
+                                <span className="text-gray-300">×{item.quantity}</span>{" "}
+                                <span className="text-gray-500">{item.product_name}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-600">—</span>
+                          )}
+                        </td>
                         <td className="p-3">
                           <div>{o.customer_name || "—"}</div>
                           <div className="text-xs text-gray-500">{o.customer_email || "—"}</div>
                         </td>
+                        {orderFilter === PENDING_FILTER && (
+                          <td className="p-3 text-xs align-top min-w-[10rem]">
+                            {o.status !== "pending_payment" ? (
+                              <span className="text-gray-600">—</span>
+                            ) : o.superseded_by_order ? (
+                              <div className="text-green-400 font-semibold">
+                                Paid on a later order
+                                <div className="font-mono font-normal text-gray-500">{o.superseded_by_order}</div>
+                              </div>
+                            ) : !o.nudge_phone_valid ? (
+                              <span className="text-amber-400 font-semibold">Fix phone number</span>
+                            ) : (
+                              (() => {
+                                const count = o.nudge_count ?? 0;
+                                const state = nudgeState[o.id];
+                                return (
+                                  <div className="space-y-1">
+                                    {count >= MAX_NUDGES ? (
+                                      <span className="text-gray-400 font-semibold">Reminders done</span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => sendNudge(o.id)}
+                                        disabled={state?.busy}
+                                        aria-busy={state?.busy || undefined}
+                                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold whitespace-nowrap disabled:opacity-50 disabled:cursor-wait focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
+                                      >
+                                        {state?.busy ? "Opening…" : count === 0 ? "Nudge" : "Send final nudge"}
+                                      </button>
+                                    )}
+                                    {count > 0 && o.last_nudged_at && (
+                                      <div className="text-gray-500">
+                                        Nudged {count}× · {timeAgo(o.last_nudged_at)}
+                                      </div>
+                                    )}
+                                    {state?.error && (
+                                      <div role="alert" className="text-red-400">
+                                        {state.error}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()
+                            )}
+                          </td>
+                        )}
                         <td className="p-3 text-xs text-gray-400 max-w-xs">
                           {o.fulfilment_method === "collection" ? (
                             <>

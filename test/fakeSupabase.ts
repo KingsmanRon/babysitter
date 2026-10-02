@@ -75,6 +75,11 @@ class QueryBuilder {
     return this;
   }
 
+  gt(column: string, value: string) {
+    this.filters.push((row) => typeof row[column] === "string" && (row[column] as string) > value);
+    return this;
+  }
+
   lt(column: string, value: string) {
     this.filters.push((row) => typeof row[column] === "string" && (row[column] as string) < value);
     return this;

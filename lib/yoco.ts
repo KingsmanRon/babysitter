@@ -3,6 +3,7 @@ import { env, processingMode } from "./env.js";
 import { log } from "./logger.js";
 import { supabaseAdmin } from "./supabaseAdmin.js";
 import { YOCO_API_BASE } from "./yocoApi.js";
+import { CUSTOMER_COLUMNS, supersedeEarlierOrders } from "./supersede.js";
 
 const YOCO_CHECKOUT_URL = `${YOCO_API_BASE}/checkouts`;
 
@@ -65,12 +66,21 @@ export class SoldOutError extends Error {
   }
 }
 
+// The order can't be paid any more (already paid, cancelled or superseded).
+// The message is safe to show the buyer.
+export class OrderClosedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OrderClosedError";
+  }
+}
+
 export async function createYocoCheckout(orderId: string): Promise<{ redirectUrl: string; checkoutId: string }> {
   const db = supabaseAdmin();
 
   const { data: order, error: orderErr } = await db
     .from("orders")
-    .select("id, order_number, amount_cents, currency, status")
+    .select("id, order_number, amount_cents, currency, status, superseded_by")
     .eq("id", orderId)
     .single();
   if (orderErr || !order) {
@@ -78,7 +88,13 @@ export async function createYocoCheckout(orderId: string): Promise<{ redirectUrl
     throw new Error("Order not found");
   }
   if (order.status === "paid") {
-    throw new Error("Order is already paid");
+    throw new OrderClosedError("This order is already paid.");
+  }
+  if (order.superseded_by) {
+    throw new OrderClosedError(`You already paid for this on order ${order.superseded_by}.`);
+  }
+  if (order.status === "cancelled" || order.status === "refunded") {
+    throw new OrderClosedError("This order was cancelled. Please place a new order.");
   }
 
   // Restart the stock hold for the time the buyer spends on Yoco's page. If
@@ -200,7 +216,7 @@ export async function createYocoCheckout(orderId: string): Promise<{ redirectUrl
     .from("orders")
     .update({ status: "pending_payment" })
     .eq("id", order.id)
-    .in("status", ["draft", "pending_payment", "payment_failed", "expired", "cancelled"]);
+    .in("status", ["draft", "pending_payment", "payment_failed", "expired"]);
   if (orderUpdateErr) {
     log.warn("yoco.create_checkout.order_status_update_failed", {
       orderId,
@@ -555,7 +571,7 @@ export async function recordPaymentSucceeded(p: SucceededPayment): Promise<{ tra
     .update({ status: "paid" })
     .eq("id", p.orderId)
     .neq("status", "paid")
-    .select("id, status")
+    .select(CUSTOMER_COLUMNS)
     .maybeSingle();
   if (orderErr) {
     log.error(`yoco.${p.source}.order_update_failed`, { orderId: p.orderId, err: orderErr.message });
@@ -594,6 +610,15 @@ export async function recordPaymentSucceeded(p: SucceededPayment): Promise<{ tra
         metadata: { stock_flags: stockIssues, flagged_at: new Date().toISOString() },
       })
       .eq("id", p.orderId);
+  }
+
+  // The customer may have abandoned earlier attempts and paid on this new
+  // order: cancel those so they aren't chased or left holding stock. Never
+  // fails the payment: the order is already paid.
+  try {
+    await supersedeEarlierOrders(paidOrder);
+  } catch (err) {
+    log.error(`yoco.${p.source}.supersede_failed`, { orderId: p.orderId, err: (err as Error).message });
   }
 
   log.info(`yoco.${p.source}.paid`, { orderId: p.orderId, eventId: p.eventId, paymentId: p.paymentId });
