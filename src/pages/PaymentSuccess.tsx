@@ -106,9 +106,28 @@ export default function PaymentSuccess() {
             and see "pending", give it a few seconds for the webhook to arrive.
           </p>
 
+          {isPaid && orderId && (
+            <>
+              <p className="text-sm text-gray-400">
+                Keep your order number. You can check on your order any time at{" "}
+                <span className="text-white">babysitterbs.co.za/track</span>.
+              </p>
+              <Link
+                to={`/track/${orderId}`}
+                className="block w-full text-center py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition"
+              >
+                Track your order
+              </Link>
+            </>
+          )}
+
           <Link
             to="/"
-            className="block w-full text-center py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition"
+            className={
+              isPaid && orderId
+                ? "block w-full text-center py-3 border border-gray-700 text-gray-300 font-semibold rounded-xl hover:border-gray-500 transition"
+                : "block w-full text-center py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition"
+            }
           >
             Continue shopping
           </Link>

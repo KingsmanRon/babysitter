@@ -75,6 +75,12 @@ class QueryBuilder {
     return this;
   }
 
+  not(column: string, operator: "is", value: null) {
+    if (operator !== "is" || value !== null) throw new Error("fake only supports not(col, 'is', null)");
+    this.filters.push((row) => row[column] != null);
+    return this;
+  }
+
   gt(column: string, value: string) {
     this.filters.push((row) => typeof row[column] === "string" && (row[column] as string) > value);
     return this;

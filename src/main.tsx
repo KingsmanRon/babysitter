@@ -11,6 +11,7 @@ const PaymentCancelled = lazy(() => import("./pages/PaymentCancelled"));
 const PaymentFailed = lazy(() => import("./pages/PaymentFailed"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Pay = lazy(() => import("./pages/Pay"));
+const Track = lazy(() => import("./pages/Track"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -25,6 +26,8 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/payment/failed" element={<PaymentFailed />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/pay/:orderId" element={<Pay />} />
+          <Route path="/track" element={<Track />} />
+          <Route path="/track/:orderId" element={<Track />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

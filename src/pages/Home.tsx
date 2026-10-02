@@ -111,7 +111,7 @@ const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'How can I track my order?',
         answer:
-          'A tracking link will be emailed to you once your order has shipped. You can also check your order status by contacting our support team.',
+          'Go to babysitterbs.co.za/track and enter your order number (it starts with BS- and is on your payment confirmation) plus the email or phone number you ordered with. You will see whether it is packed, out for delivery or delivered, and the courier tracking number once it ships.',
       },
       {
         question: 'How do I hear about new drops?',
@@ -455,7 +455,17 @@ const Contact = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-3">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Link to="/track" className={tile}>
+            <div className="flex items-center justify-between font-jbmono text-xs uppercase tracking-[0.2em]">
+              <span>Track order</span>
+              <Truck className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-anton uppercase text-4xl leading-none">Where's my order?</p>
+              <p className="mt-2 font-archivo text-sm opacity-70">Order number + email or phone.</p>
+            </div>
+          </Link>
           <div className={tile}>
             <div className="flex items-center justify-between font-jbmono text-xs uppercase tracking-[0.2em]">
               <span>Email</span>
@@ -509,6 +519,7 @@ const Footer = ({ onOpenPrivacy, onOpenTerms }: { onOpenPrivacy: () => void; onO
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-[#f4f1ea]/60">
         <Link to="/smilano" className="hover:text-[#f4f1ea] transition-colors">S’milano drop</Link>
+        <Link to="/track" className="hover:text-[#f4f1ea] transition-colors">Track order</Link>
         <button onClick={onOpenPrivacy} className="uppercase hover:text-[#f4f1ea] transition-colors">Privacy</button>
         <button onClick={onOpenTerms} className="uppercase hover:text-[#f4f1ea] transition-colors">Terms</button>
         <span>&copy; {new Date().getFullYear()} BABYSITTER</span>

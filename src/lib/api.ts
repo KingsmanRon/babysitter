@@ -106,6 +106,41 @@ export async function createYocoCheckout(orderId: string): Promise<{ redirectUrl
   return asJson<{ redirectUrl: string }>(res);
 }
 
+export type TrackingStep = { key: string; label: string; done: boolean; at: string | null };
+
+export type TrackingView = {
+  orderNumber: string;
+  placedAt: string;
+  amountCents: number;
+  currency: string;
+  method: "delivery" | "collection";
+  stage: string;
+  headline: string;
+  detail: string | null;
+  steps: TrackingStep[];
+  courier: string | null;
+  trackingNumber: string | null;
+  destination: string | null;
+  items: Array<{ product_name: string; size: string | null; quantity: number }>;
+  payOrderId: string | null;
+};
+
+// Look up an order by its number plus the email or phone used to order.
+export async function trackOrder(orderNumber: string, contact: string): Promise<TrackingView> {
+  const res = await fetch("/api/orders/track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderNumber, contact }),
+  });
+  return (await asJson<{ order: TrackingView }>(res)).order;
+}
+
+// Look up an order from the private link on the payment pages.
+export async function trackOrderById(id: string): Promise<TrackingView> {
+  const res = await fetch(`/api/orders/track?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+  return (await asJson<{ order: TrackingView }>(res)).order;
+}
+
 export async function fetchOrder(id: string): Promise<{ order: Order; items: OrderItem[] }> {
   const res = await fetch(`/api/orders/${id}`, { cache: "no-store" });
   return asJson<{ order: Order; items: OrderItem[] }>(res);
