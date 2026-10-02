@@ -29,6 +29,11 @@ type AdminSummary = {
     ship_province: string | null;
     ship_postal_code: string | null;
     metadata?: { stock_flags?: unknown[] } | null;
+    fulfilment_status?: string | null;
+    courier?: string | null;
+    tracking_number?: string | null;
+    dispatched_at?: string | null;
+    delivered_at?: string | null;
     created_at: string;
   }>;
   transactions: Array<{
@@ -65,17 +70,36 @@ type AdminSummary = {
 
 type AdminProduct = AdminSummary["products"][number];
 
-// Must match STATUS_FILTERS in api/admin/summary.ts.
-const ORDER_FILTERS = [
+// Each key is the query string sent to /api/admin/summary; must match
+// STATUS_FILTERS / FULFILMENT_FILTERS there.
+const PAYMENT_FILTERS = [
   { key: "", label: "All" },
-  { key: "paid", label: "Paid" },
-  { key: "pending", label: "Pending" },
-  { key: "failed", label: "Failed" },
-  { key: "expired", label: "Expired" },
-  { key: "cancelled", label: "Cancelled" },
-  { key: "refunded", label: "Refunded" },
-] as const;
-type OrderFilter = (typeof ORDER_FILTERS)[number]["key"];
+  { key: "status=paid", label: "Paid" },
+  { key: "status=pending", label: "Pending" },
+  { key: "status=failed", label: "Failed" },
+  { key: "status=expired", label: "Expired" },
+  { key: "status=cancelled", label: "Cancelled" },
+  { key: "status=refunded", label: "Refunded" },
+];
+const FULFILMENT_FILTERS = [
+  { key: "fulfilment=to_fulfil", label: "To pack & send" },
+  { key: "fulfilment=dispatched", label: "Out for delivery / ready" },
+  { key: "fulfilment=done", label: "Delivered / collected" },
+];
+
+// Must match DELIVERY_STEPS / COLLECTION_STEPS in lib/fulfilment.ts.
+const FULFILMENT_LABELS: Record<string, string> = {
+  unfulfilled: "Not packed",
+  packed: "Packed",
+  out_for_delivery: "Out for delivery",
+  delivered: "Delivered",
+  ready_for_collection: "Ready for collection",
+  collected: "Collected",
+};
+const DELIVERY_STEPS = ["unfulfilled", "packed", "out_for_delivery", "delivered"];
+const COLLECTION_STEPS = ["unfulfilled", "packed", "ready_for_collection", "collected"];
+
+type TrackingDraft = { courier: string; tracking_number: string };
 
 const saleDraftFromProduct = (product: AdminProduct): ProductSaleDraft => ({
   compare_at_price_cents: product.compare_at_price_cents?.toString() ?? "",
@@ -115,14 +139,16 @@ export default function Admin() {
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [orderFilter, setOrderFilter] = useState<OrderFilter>("");
+  const [orderFilter, setOrderFilter] = useState("");
+  const [trackingDrafts, setTrackingDrafts] = useState<Record<string, TrackingDraft>>({});
+  const [savingOrderId, setSavingOrderId] = useState<string | null>(null);
 
-  const load = async (t: string, filter: OrderFilter = orderFilter) => {
+  const load = async (t: string, filter: string = orderFilter) => {
     if (!t) return;
     setLoading(true);
     setError(null);
     try {
-      const query = filter ? `?status=${encodeURIComponent(filter)}` : "";
+      const query = filter ? `?${filter}` : "";
       const res = await fetch(`/api/admin/summary${query}`, {
         headers: { "x-admin-token": t },
       });
@@ -190,6 +216,32 @@ export default function Admin() {
       setError((err as Error).message);
     } finally {
       setSavingProductId(null);
+    }
+  };
+
+  const updateFulfilment = async (orderId: string, body: Record<string, string | null>) => {
+    setSavingOrderId(orderId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const responseBody = await res.json().catch(() => ({}));
+        throw new Error(responseBody.error || `HTTP ${res.status}`);
+      }
+      setTrackingDrafts((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+      await load(token);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSavingOrderId(null);
     }
   };
 
@@ -345,26 +397,32 @@ export default function Admin() {
 
             <section className="space-y-3">
               <h2 className="text-xl font-bold">Orders ({data.orders.length})</h2>
-              <div className="flex flex-wrap gap-2">
-                {ORDER_FILTERS.map((f) => (
-                  <button
-                    key={f.key || "all"}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => {
-                      setOrderFilter(f.key);
-                      load(token, f.key);
-                    }}
-                    className={`px-3 py-1 rounded-full text-sm font-semibold border disabled:opacity-50 ${
-                      orderFilter === f.key
-                        ? "bg-purple-600 border-purple-600 text-white"
-                        : "border-gray-700 text-gray-300 hover:border-gray-500"
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
+              {[
+                { title: "Payment", filters: PAYMENT_FILTERS },
+                { title: "Fulfilment", filters: FULFILMENT_FILTERS },
+              ].map((group) => (
+                <div key={group.title} className="flex flex-wrap items-center gap-2">
+                  <span className="w-20 text-xs uppercase tracking-wide text-gray-500">{group.title}</span>
+                  {group.filters.map((f) => (
+                    <button
+                      key={f.key || "all"}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => {
+                        setOrderFilter(f.key);
+                        load(token, f.key);
+                      }}
+                      className={`px-3 py-1 rounded-full text-sm font-semibold border disabled:opacity-50 ${
+                        orderFilter === f.key
+                          ? "bg-purple-600 border-purple-600 text-white"
+                          : "border-gray-700 text-gray-300 hover:border-gray-500"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
               <div className="overflow-x-auto rounded-xl border border-gray-800">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-900 text-gray-400">
@@ -374,6 +432,7 @@ export default function Admin() {
                       <th className="text-right p-3">Amount</th>
                       <th className="text-left p-3">Customer</th>
                       <th className="text-left p-3">Deliver to</th>
+                      <th className="text-left p-3">Fulfilment</th>
                       <th className="text-left p-3">Created</th>
                     </tr>
                   </thead>
@@ -422,6 +481,93 @@ export default function Admin() {
                             </>
                           ) : (
                             "—"
+                          )}
+                        </td>
+                        <td className="p-3 text-xs align-top min-w-[13rem]">
+                          {o.status !== "paid" ? (
+                            <span className="text-gray-600">—</span>
+                          ) : (
+                            (() => {
+                              const isCollection = o.fulfilment_method === "collection";
+                              const steps = isCollection ? COLLECTION_STEPS : DELIVERY_STEPS;
+                              const current = o.fulfilment_status || "unfulfilled";
+                              const draft = trackingDrafts[o.id] ?? {
+                                courier: o.courier ?? "",
+                                tracking_number: o.tracking_number ?? "",
+                              };
+                              const saving = savingOrderId === o.id;
+                              const done = current === "delivered" || current === "collected";
+                              return (
+                                <div className="space-y-1.5">
+                                  <select
+                                    value={current}
+                                    disabled={saving}
+                                    onChange={(e) => updateFulfilment(o.id, { fulfilment_status: e.target.value })}
+                                    className={`w-full px-2 py-1 bg-gray-800 border rounded focus:outline-none focus:border-purple-500 disabled:opacity-50 ${
+                                      done
+                                        ? "border-green-700 text-green-400"
+                                        : current === "unfulfilled"
+                                          ? "border-amber-700 text-amber-300"
+                                          : "border-gray-700 text-white"
+                                    }`}
+                                  >
+                                    {steps.map((step) => (
+                                      <option key={step} value={step}>
+                                        {FULFILMENT_LABELS[step]}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {!isCollection && (
+                                    <div className="flex gap-1">
+                                      <input
+                                        value={draft.courier}
+                                        placeholder="Courier"
+                                        onChange={(e) =>
+                                          setTrackingDrafts((prev) => ({ ...prev, [o.id]: { ...draft, courier: e.target.value } }))
+                                        }
+                                        className="w-20 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500"
+                                      />
+                                      <input
+                                        value={draft.tracking_number}
+                                        placeholder="Tracking #"
+                                        onChange={(e) =>
+                                          setTrackingDrafts((prev) => ({
+                                            ...prev,
+                                            [o.id]: { ...draft, tracking_number: e.target.value },
+                                          }))
+                                        }
+                                        className="w-28 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500"
+                                      />
+                                      {trackingDrafts[o.id] && (
+                                        <button
+                                          type="button"
+                                          disabled={saving}
+                                          onClick={() =>
+                                            updateFulfilment(o.id, {
+                                              courier: draft.courier,
+                                              tracking_number: draft.tracking_number,
+                                            })
+                                          }
+                                          className="px-2 py-1 bg-purple-600 rounded font-semibold disabled:opacity-50"
+                                        >
+                                          Save
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                  {o.dispatched_at && (
+                                    <div className="text-gray-500">
+                                      {isCollection ? "Ready" : "Sent"} {new Date(o.dispatched_at).toLocaleString()}
+                                    </div>
+                                  )}
+                                  {o.delivered_at && (
+                                    <div className="text-green-500">
+                                      {isCollection ? "Collected" : "Delivered"} {new Date(o.delivered_at).toLocaleString()}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()
                           )}
                         </td>
                         <td className="p-3 text-xs text-gray-400">

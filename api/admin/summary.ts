@@ -12,6 +12,13 @@ const STATUS_FILTERS: Record<string, string[]> = {
   refunded: ["refunded"],
 };
 
+// Fulfilment filter name -> fulfilment steps (paid orders only).
+const FULFILMENT_FILTERS: Record<string, string[]> = {
+  to_fulfil: ["unfulfilled", "packed"],
+  dispatched: ["out_for_delivery", "ready_for_collection"],
+  done: ["delivered", "collected"],
+};
+
 function unauthorized(res: VercelResponse) {
   return res.status(401).json({ error: "Unauthorized" });
 }
@@ -34,15 +41,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const db = supabaseAdmin();
     // Read from the URL rather than req.query, which goes through Node's
     // deprecated url.parse() inside Vercel's helpers.
-    const statusParam = new URL(req.url ?? "/", "http://localhost").searchParams.get("status") ?? "";
-    const statuses = STATUS_FILTERS[statusParam];
+    const params = new URL(req.url ?? "/", "http://localhost").searchParams;
+    const fulfilmentSteps = FULFILMENT_FILTERS[params.get("fulfilment") ?? ""];
+    // Only paid orders get fulfilled, so a fulfilment filter implies "paid".
+    const statuses = fulfilmentSteps ? ["paid"] : STATUS_FILTERS[params.get("status") ?? ""];
 
     let ordersQuery = db
       .from("orders")
       .select(
-        "id, order_number, status, amount_cents, currency, customer_email, customer_name, fulfilment_method, delivery_fee_cents, ship_phone, ship_line1, ship_line2, ship_suburb, ship_city, ship_province, ship_postal_code, metadata, created_at, updated_at",
+        "id, order_number, status, amount_cents, currency, customer_email, customer_name, fulfilment_method, delivery_fee_cents, ship_phone, ship_line1, ship_line2, ship_suburb, ship_city, ship_province, ship_postal_code, metadata, fulfilment_status, courier, tracking_number, dispatched_at, delivered_at, created_at, updated_at",
       );
     if (statuses) ordersQuery = ordersQuery.in("status", statuses);
+    if (fulfilmentSteps) ordersQuery = ordersQuery.in("fulfilment_status", fulfilmentSteps);
     const { data: orders } = await ordersQuery.order("created_at", { ascending: false }).limit(100);
 
     const orderIds = (orders || []).map((o) => o.id);
