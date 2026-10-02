@@ -22,10 +22,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq("is_active", true)
       .order("created_at", { ascending: true });
     if (error) throw error;
-    // Let Vercel's CDN absorb traffic spikes: one function call per region
-    // every ~10s instead of one per visitor. Browsers always revalidate, and
-    // live stock counts arrive over Supabase Realtime regardless.
-    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=10, stale-while-revalidate=30");
+    // Let Vercel's CDN absorb traffic spikes: at most one function call per
+    // region every ~5s instead of one per visitor. Browsers always revalidate,
+    // and live stock counts arrive over Supabase Realtime regardless.
+    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=5, stale-while-revalidate=10");
     return res.status(200).json({ products: data || [] });
   } catch (err) {
     log.error("api.products.error", { err: (err as Error).message });

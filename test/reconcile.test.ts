@@ -5,6 +5,7 @@ import {
   RECONCILE_THROTTLE_SECONDS,
   reconcileOrder,
   reconcilePendingOrders,
+  resetReconcileThrottleForTests,
 } from "../lib/reconcile.js";
 import { setSupabaseAdminForTests } from "../lib/supabaseAdmin.js";
 import { createFakeSupabase, pendingOrderState, type DbState } from "./fakeSupabase.js";
@@ -17,6 +18,7 @@ type CheckoutReply = { status: number; body?: Record<string, unknown> } | ((stat
 
 async function withYoco<T>(state: DbState, reply: CheckoutReply, fn: () => Promise<T>) {
   process.env.YOCO_SECRET_KEY = "sk_test_reconcile";
+  resetReconcileThrottleForTests();
   setSupabaseAdminForTests(createFakeSupabase(state) as never);
   const calls: string[] = [];
   const fetchMock = mock.method(globalThis, "fetch", async (url: string, init?: RequestInit) => {
@@ -73,7 +75,7 @@ test("asks Yoco about one checkout at most once per throttle window", async () =
   assert.equal(calls.length, 2);
 });
 
-test(`an unpaid checkout is left open until ${PENDING_EXPIRY_MINUTES} minutes, then expired and its stock released`, async () => {
+test(`an unpaid checkout is left open until ${PENDING_EXPIRY_MINUTES} minutes, then cancelled (expired) and its stock released`, async () => {
   const state = pendingOrderState();
   const { result } = await withYoco(state, open, async () => [
     await reconcileOrder("order-1", { now: at(PENDING_EXPIRY_MINUTES - 1) }),
@@ -81,7 +83,7 @@ test(`an unpaid checkout is left open until ${PENDING_EXPIRY_MINUTES} minutes, t
   ]);
 
   assert.deepEqual(result, ["open", "expired"]);
-  assert.equal(state.orders[0].status, "expired");
+  assert.equal(state.orders[0].status, "cancelled");
   assert.equal(state.payment_transactions[0].provider_status, "expired");
   assert.ok(state.payment_transactions[0].failed_at);
   assert.deepEqual(state.rpcCalls?.map((c) => c.name), ["release_order_stock"]);
@@ -93,7 +95,7 @@ test("a checkout Yoco reports expired is expired straight away", async () => {
     reconcileOrder("order-1", { now: at(5) }),
   );
   assert.equal(result, "expired");
-  assert.equal(state.orders[0].status, "expired");
+  assert.equal(state.orders[0].status, "cancelled");
 });
 
 test("never expires a checkout Yoco is still processing", async () => {
@@ -126,7 +128,7 @@ test("a recorded decline keeps its failed status when the order expires", async 
   Object.assign(state.payment_transactions[0], { provider_status: "failed", failed_at: "2026-10-02T07:05:00.000Z" });
   const { result } = await withYoco(state, open, () => reconcileOrder("order-1", { now: at(PENDING_EXPIRY_MINUTES + 1) }));
   assert.equal(result, "expired");
-  assert.equal(state.orders[0].status, "expired");
+  assert.equal(state.orders[0].status, "cancelled");
   assert.equal(state.payment_transactions[0].provider_status, "failed");
 });
 
@@ -169,6 +171,6 @@ test("the sweep checks open orders only, and a dry run changes nothing", async (
 
   const real = await withYoco(state, open, () => reconcilePendingOrders({ now: at(30) }));
   assert.equal(real.result.outcomes.expired, 1);
-  assert.equal(state.orders.find((o) => o.id === "order-old")!.status, "expired");
+  assert.equal(state.orders.find((o) => o.id === "order-old")!.status, "cancelled");
   assert.equal(state.orders.find((o) => o.id === "order-paid")!.status, "paid");
 });

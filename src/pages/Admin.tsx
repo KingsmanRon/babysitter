@@ -65,6 +65,17 @@ type AdminSummary = {
 
 type AdminProduct = AdminSummary["products"][number];
 
+// Must match STATUS_FILTERS in api/admin/summary.ts.
+const ORDER_FILTERS = [
+  { key: "", label: "All" },
+  { key: "paid", label: "Paid" },
+  { key: "pending", label: "Pending" },
+  { key: "failed", label: "Failed" },
+  { key: "cancelled", label: "Cancelled / expired" },
+  { key: "refunded", label: "Refunded" },
+] as const;
+type OrderFilter = (typeof ORDER_FILTERS)[number]["key"];
+
 const saleDraftFromProduct = (product: AdminProduct): ProductSaleDraft => ({
   compare_at_price_cents: product.compare_at_price_cents?.toString() ?? "",
   sale_price_cents: product.sale_price_cents?.toString() ?? "",
@@ -103,13 +114,15 @@ export default function Admin() {
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [orderFilter, setOrderFilter] = useState<OrderFilter>("");
 
-  const load = async (t: string) => {
+  const load = async (t: string, filter: OrderFilter = orderFilter) => {
     if (!t) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/summary", {
+      const query = filter ? `?status=${encodeURIComponent(filter)}` : "";
+      const res = await fetch(`/api/admin/summary${query}`, {
         headers: { "x-admin-token": t },
       });
       if (!res.ok) {
@@ -331,6 +344,26 @@ export default function Admin() {
 
             <section className="space-y-3">
               <h2 className="text-xl font-bold">Orders ({data.orders.length})</h2>
+              <div className="flex flex-wrap gap-2">
+                {ORDER_FILTERS.map((f) => (
+                  <button
+                    key={f.key || "all"}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setOrderFilter(f.key);
+                      load(token, f.key);
+                    }}
+                    className={`px-3 py-1 rounded-full text-sm font-semibold border disabled:opacity-50 ${
+                      orderFilter === f.key
+                        ? "bg-purple-600 border-purple-600 text-white"
+                        : "border-gray-700 text-gray-300 hover:border-gray-500"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
               <div className="overflow-x-auto rounded-xl border border-gray-800">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-900 text-gray-400">
@@ -352,7 +385,7 @@ export default function Admin() {
                             className={
                               o.status === "paid"
                                 ? "text-green-400"
-                                : o.status === "payment_failed" || o.status === "expired"
+                                : o.status === "payment_failed"
                                   ? "text-red-400"
                                   : "text-gray-300"
                             }

@@ -2,6 +2,15 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { supabaseAdmin } from "../../lib/supabaseAdmin.js";
 import { log } from "../../lib/logger.js";
 
+// Admin filter name -> order statuses it covers.
+const STATUS_FILTERS: Record<string, string[]> = {
+  paid: ["paid"],
+  pending: ["draft", "pending_payment"],
+  failed: ["payment_failed"],
+  cancelled: ["cancelled"],
+  refunded: ["refunded"],
+};
+
 function unauthorized(res: VercelResponse) {
   return res.status(401).json({ error: "Unauthorized" });
 }
@@ -22,14 +31,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const db = supabaseAdmin();
+    // Read from the URL rather than req.query, which goes through Node's
+    // deprecated url.parse() inside Vercel's helpers.
+    const statusParam = new URL(req.url ?? "/", "http://localhost").searchParams.get("status") ?? "";
+    const statuses = STATUS_FILTERS[statusParam];
 
-    const { data: orders } = await db
+    let ordersQuery = db
       .from("orders")
       .select(
         "id, order_number, status, amount_cents, currency, customer_email, customer_name, fulfilment_method, delivery_fee_cents, ship_phone, ship_line1, ship_line2, ship_suburb, ship_city, ship_province, ship_postal_code, metadata, created_at, updated_at",
-      )
-      .order("created_at", { ascending: false })
-      .limit(100);
+      );
+    if (statuses) ordersQuery = ordersQuery.in("status", statuses);
+    const { data: orders } = await ordersQuery.order("created_at", { ascending: false }).limit(100);
 
     const orderIds = (orders || []).map((o) => o.id);
     const { data: txs } = orderIds.length

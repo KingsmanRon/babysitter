@@ -11,12 +11,21 @@ import { getYocoCheckout, YocoApiError, type YocoCheckout } from "./yocoApi.js";
 // Give the webhook a head start before asking Yoco ourselves.
 export const RECONCILE_MIN_AGE_MINUTES = 2;
 // An order whose checkout hasn't completed this long after it was created is
-// expired. That is twice the 30-minute stock hold, so the units are already
-// back on sale by then; a buyer who still pays later is caught by the webhook
-// (or the next pass), which moves the order from expired to paid.
+// expired: the order becomes "cancelled" (an existing status, so no schema
+// change) and its transaction "expired". That is twice the 30-minute stock
+// hold, so the units are already back on sale by then; a buyer who still pays
+// later is caught by the webhook (or the next pass), which moves the order to
+// paid.
 export const PENDING_EXPIRY_MINUTES = 60;
+export const EXPIRED_ORDER_STATUS = "cancelled";
 // Ask Yoco about the same checkout at most this often (status page polls).
+// Kept in memory per server instance, so it needs no database column.
 export const RECONCILE_THROTTLE_SECONDS = 30;
+const lastChecked = new Map<string, number>();
+
+export function resetReconcileThrottleForTests(): void {
+  lastChecked.clear();
+}
 
 const OPEN_ORDER_STATUSES = ["pending_payment", "payment_failed"];
 const PAID_CHECKOUT_STATUSES = new Set(["completed", "succeeded", "successful", "paid"]);
@@ -40,7 +49,6 @@ type CheckoutTx = {
   provider_status: string | null;
   paid_at: string | null;
   created_at: string;
-  last_reconciled_at: string | null;
 };
 
 const minutes = (n: number) => n * 60_000;
@@ -48,7 +56,7 @@ const minutes = (n: number) => n * 60_000;
 async function latestCheckout(orderId: string): Promise<CheckoutTx | null> {
   const { data, error } = await supabaseAdmin()
     .from("payment_transactions")
-    .select("id, provider_checkout_id, provider_status, paid_at, created_at, last_reconciled_at")
+    .select("id, provider_checkout_id, provider_status, paid_at, created_at")
     .eq("order_id", orderId)
     .eq("provider", "yoco");
   if (error) throw new Error(`payment_transactions lookup failed: ${error.message}`);
@@ -72,7 +80,7 @@ async function expireOrder(
   // Atomic: if a webhook marked the order paid meanwhile, leave it alone.
   const { data: expired, error } = await db
     .from("orders")
-    .update({ status: "expired" })
+    .update({ status: EXPIRED_ORDER_STATUS })
     .eq("id", order.id)
     .in("status", OPEN_ORDER_STATUSES)
     .select("id")
@@ -119,16 +127,12 @@ export async function reconcileOrder(orderId: string, opts: ReconcileOptions = {
   if (!tx?.provider_checkout_id) {
     return pastExpiry ? expireOrder(order, tx, "no_checkout", now, dryRun) : "open";
   }
-  if (
-    !opts.ignoreThrottle &&
-    tx.last_reconciled_at &&
-    now.getTime() - Date.parse(tx.last_reconciled_at) < RECONCILE_THROTTLE_SECONDS * 1000
-  ) {
+  const last = lastChecked.get(tx.id);
+  if (!opts.ignoreThrottle && last !== undefined && now.getTime() - last < RECONCILE_THROTTLE_SECONDS * 1000) {
     return "skipped";
   }
-  if (!dryRun) {
-    await db.from("payment_transactions").update({ last_reconciled_at: now.toISOString() }).eq("id", tx.id);
-  }
+  lastChecked.set(tx.id, now.getTime());
+  if (lastChecked.size > 5000) lastChecked.clear();
 
   let checkoutStatus: string;
   let checkout: YocoCheckout;

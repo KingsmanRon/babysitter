@@ -1,19 +1,17 @@
--- Payment reconciliation, payment-id idempotency and payment-method backfill.
+-- Payment-id idempotency and payment-method backfill.
+--
+-- OPTIONAL: the application code does not depend on this migration, so it can
+-- be deployed first and this run later at a quiet moment. Everything here is
+-- online-safe on tables of this size and safe to run more than once.
 --
 -- 1. One lifecycle row per Yoco payment id. Combined with the existing unique
 --    indexes on (provider, provider_checkout_id) and (provider,
 --    provider_event_id), and on payment_webhook_events (provider,
 --    provider_event_id), processing the same event or payment twice can't
---    create a second row.
--- 2. orders.status gains 'expired': checkouts the buyer never completed.
---    lib/reconcile.ts sets it; a late successful payment still moves the
---    order to 'paid'.
--- 3. payment_transactions.last_reconciled_at throttles how often we ask Yoco
---    about one checkout.
--- 4. Backfill card brand / last 4 / method type on paid rows from the payment
+--    create a second row. (The code already avoids it; this enforces it.)
+-- 2. An index for the reconciliation sweep's "orders still waiting" query.
+-- 3. Backfill card brand / last 4 / method type on paid rows from the payment
 --    payloads we already stored.
---
--- Safe to run more than once.
 
 -- 1 ─────────────────────────────────────────────────────────────
 do $$
@@ -39,27 +37,11 @@ create unique index if not exists payment_transactions_provider_payment_unique
   where provider_payment_id is not null;
 
 -- 2 ─────────────────────────────────────────────────────────────
-alter table public.orders drop constraint if exists orders_status_check;
-alter table public.orders
-  add constraint orders_status_check check (status in (
-    'draft',
-    'pending_payment',
-    'paid',
-    'payment_failed',
-    'cancelled',
-    'refunded',
-    'expired'
-  ));
-
 create index if not exists orders_open_payment_idx
   on public.orders(created_at)
   where status in ('pending_payment', 'payment_failed');
 
 -- 3 ─────────────────────────────────────────────────────────────
-alter table public.payment_transactions
-  add column if not exists last_reconciled_at timestamptz null;
-
--- 4 ─────────────────────────────────────────────────────────────
 -- Prefer the payload stored on the transaction row; fall back to the raw
 -- webhook event for the same payment id.
 with src as (
