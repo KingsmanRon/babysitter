@@ -60,7 +60,7 @@ VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ## Supabase setup
 
 1. Create a new project at [supabase.com](https://supabase.com).
-2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied. `0007_payment_reconciliation.sql` adds the `expired` order status, enforces one row per payment id and backfills card brand / last 4 from stored payloads; apply it before deploying the reconciliation code. `0008_order_fulfilment.sql` adds fulfilment tracking (packed, out for delivery, delivered / ready for collection, collected, plus courier and tracking number); apply it before deploying the admin fulfilment controls. `0010_order_emails.sql` adds confirmation email tracking; apply it before deploying the email feature. `0009_order_nudges.sql` adds WhatsApp reminder tracking (`nudge_count`, `last_nudged_at`) and superseded-order fields (`superseded_by`, `cancel_reason`); apply it before deploying the nudge feature.
+2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied. `0007_payment_reconciliation.sql` adds the `expired` order status, enforces one row per payment id and backfills card brand / last 4 from stored payloads; apply it before deploying the reconciliation code. `0008_order_fulfilment.sql` adds fulfilment tracking (packed, out for delivery, delivered / ready for collection, collected, plus courier and tracking number); apply it before deploying the admin fulfilment controls. `0010_order_emails.sql` adds confirmation email tracking; apply it before deploying the email feature. `0011_dispatch_emails.sql` does the same for the on-its-way email. `0009_order_nudges.sql` adds WhatsApp reminder tracking (`nudge_count`, `last_nudged_at`) and superseded-order fields (`superseded_by`, `cancel_reason`); apply it before deploying the nudge feature.
 3. Run `/supabase/seed.sql` to insert the BABYSITTER product and the S'MILANO SAVED MY LIFE tee (R500, plus R100 when delivered; 200 units split 50 each across S, M, L and XL; its page is `/smilano`).
 4. In the Supabase dashboard, go to **Database -> Replication** and confirm the `products` table is part of the `supabase_realtime` publication. The migration does this automatically; this step is just a sanity check.
 5. Copy the project URL, the service role key, and the anon key into the Vercel env vars listed above (and into `.env.local` for dev).
@@ -162,7 +162,9 @@ A valid one returns `200` and marks the order paid; `--bad-signature` must retur
 
 When an order is marked paid (webhook or reconciliation), the customer gets a branded confirmation email: the S'MILANO banner (`public/email/thanks-smilano.jpg`), their items and sizes, the total, delivery or collection, and a **Track your order** button to `/track/<order id>`. Replies go to `EMAIL_REPLY_TO`. It's sent once, on the transition to paid; an email failure never affects the payment and is shown on the order in admin.
 
-In admin, each paid order shows the email status with **Send email / Resend** (through Resend) and **Email manually** (opens your own mail app with the plain-text version: the fallback when email sending isn't set up or is failing).
+When admin marks an order **Out for delivery** (or **Ready for collection** for collection orders), the customer gets an "On its way" / "Ready for collection" email with the courier and tracking number. Type the courier and tracking number before choosing Out for delivery: they're saved with the step so the email includes them. It's sent once; moving the order back and forth doesn't resend.
+
+In admin, each paid order shows the status of each email with **Send email / Resend** (through Resend) and **Email manually** (opens your own mail app with the plain-text version: the fallback when email sending isn't set up or is failing).
 
 Setup (once):
 1. Create a Resend account and add the domain `babysitterbs.co.za` (Domains → Add domain).
@@ -283,6 +285,7 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 - `supabase/migrations/0008_order_fulfilment.sql` — fulfilment status, courier, tracking number, dispatched/delivered times.
 - `supabase/migrations/0009_order_nudges.sql` — reminder count/time, superseded order fields.
 - `supabase/migrations/0010_order_emails.sql` — confirmation email sent/failed/manual tracking.
+- `supabase/migrations/0011_dispatch_emails.sql` — on-its-way / ready-for-collection email tracking.
 
 ### Scripts and tests
 
