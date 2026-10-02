@@ -83,7 +83,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : o,
     );
 
-    const orderIds = (orders || []).map((o) => o.id);
+    const orderIds = orders.map((o) => o.id);
+
+    // What each order is for: product, size and quantity per line.
+    const { data: items } = orderIds.length
+      ? await db.from("order_items").select("order_id, product_name, size, quantity").in("order_id", orderIds)
+      : { data: [] };
+    const itemsByOrder = new Map<string, Array<{ product_name: string; size: string | null; quantity: number }>>();
+    for (const item of items || []) {
+      const list = itemsByOrder.get(item.order_id) ?? [];
+      list.push({ product_name: item.product_name, size: item.size, quantity: item.quantity });
+      itemsByOrder.set(item.order_id, list);
+    }
     const { data: txs } = orderIds.length
       ? await db
           .from("payment_transactions")
@@ -101,7 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
-      orders: orders || [],
+      orders: orders.map((o) => ({ ...o, items: itemsByOrder.get(o.id) ?? [] })),
       transactions: txs || [],
       products: products || [],
     });

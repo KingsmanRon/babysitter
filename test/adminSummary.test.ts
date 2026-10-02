@@ -13,7 +13,11 @@ async function summary(url: string) {
       { id: "o-cancelled", status: "cancelled", created_at: "2026-10-02T07:03:00Z" },
       { id: "o-expired", status: "expired", created_at: "2026-10-02T07:04:00Z" },
     ],
-    order_items: [],
+    order_items: [
+      { order_id: "o-paid", product_name: "S'MILANO SAVED MY LIFE", size: "M", quantity: 1 },
+      { order_id: "o-paid", product_name: "S'MILANO SAVED MY LIFE", size: "XL", quantity: 2 },
+      { order_id: "o-pending", product_name: "S'MILANO SAVED MY LIFE", size: "S", quantity: 1 },
+    ],
     payment_transactions: [
       { id: "t-paid", order_id: "o-paid", created_at: "2026-10-02T07:00:00Z" },
       { id: "t-pending", order_id: "o-pending", created_at: "2026-10-02T07:01:00Z" },
@@ -26,7 +30,9 @@ async function summary(url: string) {
   setSupabaseAdminForTests(createFakeSupabase(state) as never);
   const res = {
     statusCode: 0,
-    body: undefined as { orders: Array<{ id: string }>; transactions: Array<{ id: string }> } | undefined,
+    body: undefined as
+      | { orders: Array<{ id: string; items?: Array<{ size: string | null; quantity: number }> }>; transactions: Array<{ id: string }> }
+      | undefined,
     setHeader() {},
     status(code: number) {
       this.statusCode = code;
@@ -64,4 +70,14 @@ test("no or unknown filter returns every order", async () => {
     const res = await summary(url);
     assert.equal(res.body!.orders.length, 5);
   }
+});
+
+test("each order comes back with its sizes and quantities", async () => {
+  const res = await summary("/api/admin/summary?status=paid");
+  assert.deepEqual(
+    res.body!.orders[0].items!.map((i) => `${i.size}x${i.quantity}`),
+    ["Mx1", "XLx2"],
+  );
+  const all = await summary("/api/admin/summary");
+  assert.deepEqual(all.body!.orders.find((o) => o.id === "o-draft")!.items, []);
 });

@@ -34,6 +34,7 @@ type AdminSummary = {
     tracking_number?: string | null;
     dispatched_at?: string | null;
     delivered_at?: string | null;
+    items?: Array<{ product_name: string; size: string | null; quantity: number }>;
     nudge_count?: number;
     last_nudged_at?: string | null;
     // Only on pending_payment orders.
@@ -107,6 +108,27 @@ const COLLECTION_STEPS = ["unfulfilled", "packed", "ready_for_collection", "coll
 type TrackingDraft = { courier: string; tracking_number: string };
 
 const PENDING_FILTER = "status=pending";
+
+// "M ×2 · L ×1" totals across paid orders, for packing.
+function paidSizeTotals(orders: AdminSummary["orders"]): string {
+  const totals = new Map<string, number>();
+  for (const o of orders) {
+    if (o.status !== "paid") continue;
+    for (const item of o.items ?? []) {
+      const size = item.size || "No size";
+      totals.set(size, (totals.get(size) ?? 0) + item.quantity);
+    }
+  }
+  const order = ["XS", "S", "M", "L", "XL", "XXL", "2XL", "3XL"];
+  return [...totals.entries()]
+    .sort(([a], [b]) => {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    })
+    .map(([size, qty]) => `${size} ×${qty}`)
+    .join(" · ");
+}
 const MAX_NUDGES = 2;
 
 function timeAgo(iso: string): string {
@@ -480,6 +502,12 @@ export default function Admin() {
                   ))}
                 </div>
               ))}
+              {paidSizeTotals(data.orders) && (
+                <p className="text-sm text-gray-400">
+                  <span className="text-gray-500">Paid sizes in this list:</span>{" "}
+                  <span className="font-semibold text-white">{paidSizeTotals(data.orders)}</span>
+                </p>
+              )}
               <div className="overflow-x-auto rounded-xl border border-gray-800">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-900 text-gray-400">
@@ -487,6 +515,7 @@ export default function Admin() {
                       <th className="text-left p-3">Order #</th>
                       <th className="text-left p-3">Status</th>
                       <th className="text-right p-3">Amount</th>
+                      <th className="text-left p-3">Items</th>
                       <th className="text-left p-3">Customer</th>
                       {orderFilter === PENDING_FILTER && <th className="text-left p-3">Nudge</th>}
                       <th className="text-left p-3">Deliver to</th>
@@ -517,6 +546,21 @@ export default function Admin() {
                           ) : null}
                         </td>
                         <td className="p-3 text-right">{formatZarFromCents(o.amount_cents)}</td>
+                        <td className="p-3 text-xs align-top">
+                          {o.items?.length ? (
+                            o.items.map((item, i) => (
+                              <div key={i} className="whitespace-nowrap">
+                                <span className="inline-block min-w-[2.25rem] mr-1.5 px-1.5 py-0.5 rounded bg-purple-600/20 text-purple-300 font-bold text-center">
+                                  {item.size || "—"}
+                                </span>
+                                <span className="text-gray-300">×{item.quantity}</span>{" "}
+                                <span className="text-gray-500">{item.product_name}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-600">—</span>
+                          )}
+                        </td>
                         <td className="p-3">
                           <div>{o.customer_name || "—"}</div>
                           <div className="text-xs text-gray-500">{o.customer_email || "—"}</div>
