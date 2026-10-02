@@ -174,3 +174,15 @@ test("the sweep checks open orders only, and a dry run changes nothing", async (
   assert.equal(state.orders.find((o) => o.id === "order-old")!.status, "expired");
   assert.equal(state.orders.find((o) => o.id === "order-paid")!.status, "paid");
 });
+
+test("never times out an order whose stock hold was restarted by a second Pay click", async () => {
+  const state = pendingOrderState();
+  // Checkout created at 07:00; buyer clicked Pay again at 07:55, restarting the 30-minute hold.
+  Object.assign(state.orders[0], { stock_state: "reserved", reservation_expires_at: at(85).toISOString() });
+  const { result } = await withYoco(state, open, async () => [
+    await reconcileOrder("order-1", { now: at(PENDING_EXPIRY_MINUTES + 5) }),
+    await reconcileOrder("order-1", { now: at(90) }),
+  ]);
+  assert.deepEqual(result, ["open", "expired"]);
+  assert.equal(state.orders[0].status, "expired");
+});

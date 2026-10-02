@@ -41,7 +41,13 @@ export type ReconcileOptions = {
   ignoreThrottle?: boolean;
 };
 
-type OrderRow = { id: string; status: string; created_at: string };
+type OrderRow = {
+  id: string;
+  status: string;
+  created_at: string;
+  stock_state?: string | null;
+  reservation_expires_at?: string | null;
+};
 type CheckoutTx = {
   id: string;
   provider_checkout_id: string | null;
@@ -111,7 +117,7 @@ export async function reconcileOrder(orderId: string, opts: ReconcileOptions = {
 
   const { data: order, error: orderErr } = await db
     .from("orders")
-    .select("id, status, created_at")
+    .select("id, status, created_at, stock_state, reservation_expires_at")
     .eq("id", orderId)
     .maybeSingle();
   if (orderErr) throw new Error(`order lookup failed: ${orderErr.message}`);
@@ -121,7 +127,14 @@ export async function reconcileOrder(orderId: string, opts: ReconcileOptions = {
   const startedAt = Date.parse(tx?.created_at ?? order.created_at);
   const ageMs = now.getTime() - startedAt;
   if (ageMs < minutes(RECONCILE_MIN_AGE_MINUTES)) return "skipped";
-  const pastExpiry = ageMs >= minutes(PENDING_EXPIRY_MINUTES);
+  // Clicking Pay again reuses the same Yoco checkout but restarts the stock
+  // hold, so a buyer can be back on the payment page long after the checkout
+  // was created. Never time an order out while its stock hold is running.
+  const holdActive =
+    order.stock_state === "reserved" &&
+    !!order.reservation_expires_at &&
+    Date.parse(order.reservation_expires_at) > now.getTime();
+  const pastExpiry = ageMs >= minutes(PENDING_EXPIRY_MINUTES) && !holdActive;
 
   if (!tx?.provider_checkout_id) {
     return pastExpiry ? expireOrder(order, tx, "no_checkout", now, dryRun) : "open";
