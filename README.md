@@ -57,7 +57,7 @@ VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ## Supabase setup
 
 1. Create a new project at [supabase.com](https://supabase.com).
-2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied. `0007_payment_reconciliation.sql` adds the `expired` order status, enforces one row per payment id and backfills card brand / last 4 from stored payloads; apply it before deploying the reconciliation code. `0008_order_fulfilment.sql` adds fulfilment tracking (packed, out for delivery, delivered / ready for collection, collected, plus courier and tracking number); apply it before deploying the admin fulfilment controls.
+2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied. `0007_payment_reconciliation.sql` adds the `expired` order status, enforces one row per payment id and backfills card brand / last 4 from stored payloads; apply it before deploying the reconciliation code. `0008_order_fulfilment.sql` adds fulfilment tracking (packed, out for delivery, delivered / ready for collection, collected, plus courier and tracking number); apply it before deploying the admin fulfilment controls. `0009_order_nudges.sql` adds WhatsApp reminder tracking (`nudge_count`, `last_nudged_at`) and superseded-order fields (`superseded_by`, `cancel_reason`); apply it before deploying the nudge feature.
 3. Run `/supabase/seed.sql` to insert the BABYSITTER product and the S'MILANO SAVED MY LIFE tee (R500, plus R100 when delivered; 200 units split 50 each across S, M, L and XL; its page is `/smilano`).
 4. In the Supabase dashboard, go to **Database -> Replication** and confirm the `products` table is part of the `supabase_realtime` publication. The migration does this automatically; this step is just a sanity check.
 5. Copy the project URL, the service role key, and the anon key into the Vercel env vars listed above (and into `.env.local` for dev).
@@ -157,6 +157,9 @@ A valid one returns `200` and marks the order paid; `--bad-signature` must retur
 
 ## Admin
 
+- **WhatsApp nudges** (Pending tab): each `pending_payment` order gets a Nudge button that opens WhatsApp (`wa.me`) with a reminder to the customer, sent from the shop's own WhatsApp. Two reminders at most (Nudge, then Send final nudge); the message links to `/pay/<order id>`, which reopens Yoco's checkout for that order. Rows show "Fix phone number" if the phone isn't an SA mobile, and "Paid on a later order" if the same customer (same email or same last 9 phone digits) paid a newer order.
+- **Superseded orders**: when an order is paid, the same customer's earlier `pending_payment` orders are cancelled (`cancel_reason = 'superseded'`, `superseded_by` = the paid order number) and their stock released.
+
 - **Fulfilment**: each paid order has a Fulfilment dropdown. Delivery orders go Not packed → Packed → Out for delivery → Delivered, with optional courier and tracking number; collection orders go Not packed → Packed → Ready for collection → Collected. The time an order was sent/ready and delivered/collected is recorded. Filter by payment status or by fulfilment stage ("To pack & send", "Out for delivery / ready", "Delivered / collected"). Fulfilment is stored separately from payment status, so payment reconciliation never touches it.
 
 - The `/admin` page in the frontend prompts for `ADMIN_TOKEN`, then shows orders, transactions, and product stock. Type the token in; do not set a `VITE_ADMIN_TOKEN` env var, since it would be published in the site's JavaScript.
@@ -240,6 +243,7 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 - `api/cron/reconcile-payments.ts` — payment reconciliation sweep (`CRON_SECRET`-gated).
 - `api/admin/summary.ts` — `GET` admin summary (token-gated).
 - `api/admin/orders/[id].ts` — `PATCH` an order's fulfilment step, courier and tracking number (token-gated, paid orders only).
+- `api/admin/orders/[id]/nudge.ts` — `POST` records a WhatsApp reminder for a pending order and returns its `wa.me` link (token-gated).
 
 ### Server libs
 
@@ -256,6 +260,7 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 - `supabase/migrations/0006_stock_reservations.sql` — stock holds: `reserve_order_stock`, `commit_order_stock`, `release_expired_reservations`.
 - `supabase/migrations/0007_payment_reconciliation.sql` — `expired` status, payment-id uniqueness, payment-method backfill.
 - `supabase/migrations/0008_order_fulfilment.sql` — fulfilment status, courier, tracking number, dispatched/delivered times.
+- `supabase/migrations/0009_order_nudges.sql` — reminder count/time, superseded order fields.
 
 ### Scripts and tests
 
