@@ -57,7 +57,7 @@ VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ## Supabase setup
 
 1. Create a new project at [supabase.com](https://supabase.com).
-2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied. `0007_payment_reconciliation.sql` is optional (the code doesn't need it): it enforces one row per payment id and backfills card brand / last 4 from stored payloads. `0008_expired_order_status.sql` adds the `expired` order status and must be applied before deploying the reconciliation code.
+2. Open the SQL editor and run every file in `/supabase/migrations` in filename order (`0001_init.sql` first). `0004_delivery_fee.sql` adds per-product delivery fees and the delivery/collection choice on orders. `0005_size_stock.sql` adds optional per-size inventory (`products.size_stock`) and makes the stock decrement size-aware. `0006_stock_reservations.sql` holds stock for 30 minutes while a buyer pays (see Architecture notes); the API needs it, so order creation fails until it is applied. `0007_payment_reconciliation.sql` adds the `expired` order status, enforces one row per payment id and backfills card brand / last 4 from stored payloads; apply it before deploying the reconciliation code.
 3. Run `/supabase/seed.sql` to insert the BABYSITTER product and the S'MILANO SAVED MY LIFE tee (R500, plus R100 when delivered; 200 units split 50 each across S, M, L and XL; its page is `/smilano`).
 4. In the Supabase dashboard, go to **Database -> Replication** and confirm the `products` table is part of the `supabase_realtime` publication. The migration does this automatically; this step is just a sanity check.
 5. Copy the project URL, the service role key, and the anon key into the Vercel env vars listed above (and into `.env.local` for dev).
@@ -251,8 +251,7 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 
 - `supabase/migrations/0001_init.sql` — schema, RLS policies, `decrement_stock` function, realtime publication.
 - `supabase/migrations/0006_stock_reservations.sql` — stock holds: `reserve_order_stock`, `commit_order_stock`, `release_expired_reservations`.
-- `supabase/migrations/0007_payment_reconciliation.sql` — optional: payment-id uniqueness, payment-method backfill.
-- `supabase/migrations/0008_expired_order_status.sql` — `expired` order status (required by the reconciliation code).
+- `supabase/migrations/0007_payment_reconciliation.sql` — `expired` status, payment-id uniqueness, payment-method backfill.
 
 ### Scripts and tests
 

@@ -1,15 +1,18 @@
--- Payment-id idempotency and payment-method backfill.
+-- Payment reconciliation: expired order status, payment-id idempotency and
+-- payment-method backfill.
 --
--- OPTIONAL: the application code does not depend on this migration, so it can
--- be deployed first and this run later at a quiet moment. Everything here is
--- online-safe on tables of this size and safe to run more than once.
+-- REQUIRED before deploying the reconciliation code (it sets 'expired').
+-- Everything here is safe to run more than once, so re-running it after an
+-- earlier version of this file is fine. Near-instant on tables of this size.
 --
 -- 1. One lifecycle row per Yoco payment id. Combined with the existing unique
 --    indexes on (provider, provider_checkout_id) and (provider,
 --    provider_event_id), and on payment_webhook_events (provider,
 --    provider_event_id), processing the same event or payment twice can't
---    create a second row. (The code already avoids it; this enforces it.)
--- 2. An index for the reconciliation sweep's "orders still waiting" query.
+--    create a second row.
+-- 2. orders.status gains 'expired': checkouts still unpaid 60 minutes after
+--    they were created (lib/reconcile.ts). A late successful payment still
+--    moves the order to 'paid'.
 -- 3. Backfill card brand / last 4 / method type on paid rows from the payment
 --    payloads we already stored.
 
@@ -37,6 +40,18 @@ create unique index if not exists payment_transactions_provider_payment_unique
   where provider_payment_id is not null;
 
 -- 2 ─────────────────────────────────────────────────────────────
+alter table public.orders drop constraint if exists orders_status_check;
+alter table public.orders
+  add constraint orders_status_check check (status in (
+    'draft',
+    'pending_payment',
+    'paid',
+    'payment_failed',
+    'cancelled',
+    'refunded',
+    'expired'
+  ));
+
 create index if not exists orders_open_payment_idx
   on public.orders(created_at)
   where status in ('pending_payment', 'payment_failed');
