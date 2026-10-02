@@ -107,6 +107,19 @@ const COLLECTION_STEPS = ["unfulfilled", "packed", "ready_for_collection", "coll
 
 type TrackingDraft = { courier: string; tracking_number: string };
 
+// Admin tables never scroll sideways: below md each row stacks into a card,
+// with every cell labelled from its data-label attribute.
+const T = {
+  wrap: "rounded-xl border border-gray-800 overflow-hidden",
+  table: "w-full text-sm block md:table",
+  thead: "hidden md:table-header-group bg-gray-900 text-gray-400",
+  tbody: "block md:table-row-group",
+  tr: "block md:table-row border-t border-gray-800 first:border-t-0 md:first:border-t py-2 md:py-0",
+  th: "p-3 text-left font-semibold align-bottom",
+  td: "block md:table-cell px-4 py-1.5 md:p-3 align-top break-words before:block before:mb-0.5 before:text-[11px] before:uppercase before:tracking-wide before:text-gray-500 before:content-[attr(data-label)] md:before:content-none",
+};
+const INPUT = "w-full min-w-0 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500";
+
 const PENDING_FILTER = "status=pending";
 
 // "M ×2 · L ×1" totals across paid orders, for packing.
@@ -330,8 +343,8 @@ export default function Admin() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="min-h-screen bg-black text-white px-4 py-6 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Admin</h1>
           <Link to="/" className="text-sm text-purple-400 hover:text-purple-300">
@@ -366,105 +379,114 @@ export default function Admin() {
           <>
             <section className="space-y-3">
               <h2 className="text-xl font-bold">Stock</h2>
-              <div className="overflow-x-auto rounded-xl border border-gray-800">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-900 text-gray-400">
+              <div className={T.wrap}>
+                <table className={T.table}>
+                  <thead className={T.thead}>
                     <tr>
-                      <th className="text-left p-3">Product</th>
-                      <th className="text-left p-3">Slug</th>
-                      <th className="text-right p-3">Price</th>
-                      <th className="text-right p-3">Stock</th>
-                      <th className="text-right p-3">Active</th>
-                      <th className="text-left p-3">Sale price</th>
-                      <th className="text-left p-3">Compare at</th>
-                      <th className="text-left p-3">Discount bps</th>
-                      <th className="text-left p-3">Sale start</th>
-                      <th className="text-left p-3">Sale end</th>
-                      <th className="text-right p-3">Action</th>
+                      <th className={T.th}>Product</th>
+                      <th className={`${T.th} md:text-right`}>Price</th>
+                      <th className={`${T.th} md:text-right`}>Stock</th>
+                      <th className={T.th}>Active</th>
+                      <th className={`${T.th} w-[55%]`}>Sale</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className={T.tbody}>
                     {data.products.map((p) => {
                       const draft = saleDrafts[p.id] || saleDraftFromProduct(p);
-                      const inputClass =
-                        "w-32 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500";
+                      const field = (label: string, input: React.ReactNode) => (
+                        <label className="block text-xs text-gray-500 space-y-1">
+                          <span>{label}</span>
+                          {input}
+                        </label>
+                      );
                       return (
-                        <tr key={p.id} className="border-t border-gray-800">
-                          <td className="p-3">{p.name}</td>
-                          <td className="p-3 font-mono text-xs text-gray-400">{p.slug}</td>
-                          <td className="p-3 text-right">{formatZarFromCents(p.price_cents)}</td>
-                          <td className="p-3 text-right font-semibold">
+                        <tr key={p.id} className={T.tr}>
+                          <td data-label="Product" className={T.td}>
+                            <div className="font-semibold">{p.name}</div>
+                            <div className="font-mono text-xs text-gray-500">{p.slug}</div>
+                          </td>
+                          <td data-label="Price" className={`${T.td} md:text-right`}>
+                            {formatZarFromCents(p.price_cents)}
+                          </td>
+                          <td data-label="Stock" className={`${T.td} md:text-right font-semibold`}>
                             {p.stock_count}
                             {p.size_stock && (
-                              <div className="text-xs font-normal text-gray-500 whitespace-nowrap">
+                              <div className="text-xs font-normal text-gray-500">
                                 {Object.entries(p.size_stock).map(([size, n]) => `${size} ${n}`).join(" · ")}
                               </div>
                             )}
                           </td>
-                          <td className="p-3 text-right">{p.is_active ? "yes" : "no"}</td>
-                          <td className="p-3">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={draft.sale_price_cents}
-                              onChange={(e) => updateSaleDraft(p.id, "sale_price_cents", e.target.value)}
-                              className={inputClass}
-                              placeholder="cents"
-                            />
+                          <td data-label="Active" className={T.td}>
+                            {p.is_active ? "yes" : "no"}
                           </td>
-                          <td className="p-3">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={draft.compare_at_price_cents}
-                              onChange={(e) =>
-                                updateSaleDraft(p.id, "compare_at_price_cents", e.target.value)
-                              }
-                              className={inputClass}
-                              placeholder="cents"
-                            />
-                          </td>
-                          <td className="p-3">
-                            <input
-                              type="number"
-                              min="0"
-                              max="10000"
-                              step="1"
-                              value={draft.discount_percent_bps}
-                              onChange={(e) =>
-                                updateSaleDraft(p.id, "discount_percent_bps", e.target.value)
-                              }
-                              className={inputClass}
-                              placeholder="0-10000"
-                            />
-                          </td>
-                          <td className="p-3">
-                            <input
-                              type="datetime-local"
-                              value={draft.sale_starts_at}
-                              onChange={(e) => updateSaleDraft(p.id, "sale_starts_at", e.target.value)}
-                              className="w-44 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500"
-                            />
-                          </td>
-                          <td className="p-3">
-                            <input
-                              type="datetime-local"
-                              value={draft.sale_ends_at}
-                              onChange={(e) => updateSaleDraft(p.id, "sale_ends_at", e.target.value)}
-                              className="w-44 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500"
-                            />
-                          </td>
-                          <td className="p-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => saveSaleFields(p.id)}
-                              disabled={savingProductId === p.id}
-                              className="px-3 py-1 bg-purple-600 rounded font-semibold disabled:opacity-50"
-                            >
-                              {savingProductId === p.id ? "Saving..." : "Save"}
-                            </button>
+                          <td data-label="Sale" className={T.td}>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                              {field(
+                                "Sale price (cents)",
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={draft.sale_price_cents}
+                                  onChange={(e) => updateSaleDraft(p.id, "sale_price_cents", e.target.value)}
+                                  className={INPUT}
+                                  placeholder="cents"
+                                />,
+                              )}
+                              {field(
+                                "Compare at (cents)",
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={draft.compare_at_price_cents}
+                                  onChange={(e) => updateSaleDraft(p.id, "compare_at_price_cents", e.target.value)}
+                                  className={INPUT}
+                                  placeholder="cents"
+                                />,
+                              )}
+                              {field(
+                                "Discount (bps)",
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="10000"
+                                  step="1"
+                                  value={draft.discount_percent_bps}
+                                  onChange={(e) => updateSaleDraft(p.id, "discount_percent_bps", e.target.value)}
+                                  className={INPUT}
+                                  placeholder="0-10000"
+                                />,
+                              )}
+                              {field(
+                                "Sale start",
+                                <input
+                                  type="datetime-local"
+                                  value={draft.sale_starts_at}
+                                  onChange={(e) => updateSaleDraft(p.id, "sale_starts_at", e.target.value)}
+                                  className={INPUT}
+                                />,
+                              )}
+                              {field(
+                                "Sale end",
+                                <input
+                                  type="datetime-local"
+                                  value={draft.sale_ends_at}
+                                  onChange={(e) => updateSaleDraft(p.id, "sale_ends_at", e.target.value)}
+                                  className={INPUT}
+                                />,
+                              )}
+                              <div className="flex items-end">
+                                <button
+                                  type="button"
+                                  onClick={() => saveSaleFields(p.id)}
+                                  disabled={savingProductId === p.id}
+                                  className="w-full px-3 py-1 bg-purple-600 rounded font-semibold disabled:opacity-50"
+                                >
+                                  {savingProductId === p.id ? "Saving..." : "Save"}
+                                </button>
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -508,26 +530,27 @@ export default function Admin() {
                   <span className="font-semibold text-white">{paidSizeTotals(data.orders)}</span>
                 </p>
               )}
-              <div className="overflow-x-auto rounded-xl border border-gray-800">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-900 text-gray-400">
+              <div className={T.wrap}>
+                <table className={T.table}>
+                  <thead className={T.thead}>
                     <tr>
-                      <th className="text-left p-3">Order #</th>
-                      <th className="text-left p-3">Status</th>
-                      <th className="text-right p-3">Amount</th>
-                      <th className="text-left p-3">Items</th>
-                      <th className="text-left p-3">Customer</th>
-                      {orderFilter === PENDING_FILTER && <th className="text-left p-3">Nudge</th>}
-                      <th className="text-left p-3">Deliver to</th>
-                      <th className="text-left p-3">Fulfilment</th>
-                      <th className="text-left p-3">Created</th>
+                      <th className={T.th}>Order</th>
+                      <th className={T.th}>Status</th>
+                      <th className={T.th}>Items</th>
+                      <th className={T.th}>Customer</th>
+                      {orderFilter === PENDING_FILTER && <th className={T.th}>Nudge</th>}
+                      <th className={T.th}>Deliver to</th>
+                      <th className={T.th}>Fulfilment</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className={T.tbody}>
                     {data.orders.map((o) => (
-                      <tr key={o.id} className="border-t border-gray-800">
-                        <td className="p-3 font-mono text-purple-400">{o.order_number}</td>
-                        <td className="p-3">
+                      <tr key={o.id} className={T.tr}>
+                        <td data-label="Order" className={T.td}>
+                          <div className="font-mono text-purple-400">{o.order_number}</div>
+                          <div className="text-xs text-gray-500">{new Date(o.created_at).toLocaleString()}</div>
+                        </td>
+                        <td data-label="Status" className={T.td}>
                           <span
                             className={
                               o.status === "paid"
@@ -541,15 +564,15 @@ export default function Admin() {
                           >
                             {o.status}
                           </span>
+                          <div className="font-semibold">{formatZarFromCents(o.amount_cents)}</div>
                           {o.metadata?.stock_flags?.length ? (
                             <div className="text-xs font-semibold text-amber-400">Out of stock: refund</div>
                           ) : null}
                         </td>
-                        <td className="p-3 text-right">{formatZarFromCents(o.amount_cents)}</td>
-                        <td className="p-3 text-xs align-top">
+                        <td data-label="Items" className={`${T.td} text-xs`}>
                           {o.items?.length ? (
                             o.items.map((item, i) => (
-                              <div key={i} className="whitespace-nowrap">
+                              <div key={i} className="py-0.5">
                                 <span className="inline-block min-w-[2.25rem] mr-1.5 px-1.5 py-0.5 rounded bg-purple-600/20 text-purple-300 font-bold text-center">
                                   {item.size || "—"}
                                 </span>
@@ -561,12 +584,12 @@ export default function Admin() {
                             <span className="text-gray-600">—</span>
                           )}
                         </td>
-                        <td className="p-3">
+                        <td data-label="Customer" className={T.td}>
                           <div>{o.customer_name || "—"}</div>
                           <div className="text-xs text-gray-500">{o.customer_email || "—"}</div>
                         </td>
                         {orderFilter === PENDING_FILTER && (
-                          <td className="p-3 text-xs align-top min-w-[10rem]">
+                          <td data-label="Nudge" className={`${T.td} text-xs`}>
                             {o.status !== "pending_payment" ? (
                               <span className="text-gray-600">—</span>
                             ) : o.superseded_by_order ? (
@@ -590,7 +613,7 @@ export default function Admin() {
                                         onClick={() => sendNudge(o.id)}
                                         disabled={state?.busy}
                                         aria-busy={state?.busy || undefined}
-                                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold whitespace-nowrap disabled:opacity-50 disabled:cursor-wait focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
+                                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold disabled:opacity-50 disabled:cursor-wait focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
                                       >
                                         {state?.busy ? "Opening…" : count === 0 ? "Nudge" : "Send final nudge"}
                                       </button>
@@ -611,7 +634,7 @@ export default function Admin() {
                             )}
                           </td>
                         )}
-                        <td className="p-3 text-xs text-gray-400 max-w-xs">
+                        <td data-label="Deliver to" className={`${T.td} text-xs text-gray-400`}>
                           {o.fulfilment_method === "collection" ? (
                             <>
                               <div className="text-orange-300 font-semibold uppercase">Collection</div>
@@ -631,7 +654,7 @@ export default function Admin() {
                             "—"
                           )}
                         </td>
-                        <td className="p-3 text-xs align-top min-w-[13rem]">
+                        <td data-label="Fulfilment" className={`${T.td} text-xs`}>
                           {o.status !== "paid" ? (
                             <span className="text-gray-600">—</span>
                           ) : (
@@ -666,14 +689,14 @@ export default function Admin() {
                                     ))}
                                   </select>
                                   {!isCollection && (
-                                    <div className="flex gap-1">
+                                    <div className="flex flex-wrap gap-1">
                                       <input
                                         value={draft.courier}
                                         placeholder="Courier"
                                         onChange={(e) =>
                                           setTrackingDrafts((prev) => ({ ...prev, [o.id]: { ...draft, courier: e.target.value } }))
                                         }
-                                        className="w-20 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500"
+                                        className={`${INPUT} flex-1 basis-20`}
                                       />
                                       <input
                                         value={draft.tracking_number}
@@ -684,7 +707,7 @@ export default function Admin() {
                                             [o.id]: { ...draft, tracking_number: e.target.value },
                                           }))
                                         }
-                                        className="w-28 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500"
+                                        className={`${INPUT} flex-1 basis-24`}
                                       />
                                       {trackingDrafts[o.id] && (
                                         <button
@@ -718,9 +741,6 @@ export default function Admin() {
                             })()
                           )}
                         </td>
-                        <td className="p-3 text-xs text-gray-400">
-                          {new Date(o.created_at).toLocaleString()}
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -730,37 +750,34 @@ export default function Admin() {
 
             <section className="space-y-3">
               <h2 className="text-xl font-bold">Transactions ({data.transactions.length})</h2>
-              <div className="overflow-x-auto rounded-xl border border-gray-800">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-900 text-gray-400">
+              <div className={T.wrap}>
+                <table className={T.table}>
+                  <thead className={T.thead}>
                     <tr>
-                      <th className="text-left p-3">Checkout ID</th>
-                      <th className="text-left p-3">Payment ID</th>
-                      <th className="text-left p-3">Status</th>
-                      <th className="text-right p-3">Amount</th>
-                      <th className="text-left p-3">Method</th>
-                      <th className="text-left p-3">Mode</th>
-                      <th className="text-left p-3">Paid / Failed</th>
+                      <th className={T.th}>Checkout / Payment ID</th>
+                      <th className={T.th}>Status</th>
+                      <th className={`${T.th} md:text-right`}>Amount</th>
+                      <th className={T.th}>Method</th>
+                      <th className={T.th}>Mode</th>
+                      <th className={T.th}>Paid / Failed</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className={T.tbody}>
                     {data.transactions.map((t) => (
-                      <tr key={t.id} className="border-t border-gray-800">
-                        <td className="p-3 font-mono text-xs break-all">
-                          {t.provider_checkout_id || "—"}
+                      <tr key={t.id} className={T.tr}>
+                        <td data-label="Checkout / Payment ID" className={`${T.td} font-mono text-xs break-all`}>
+                          <div>{t.provider_checkout_id || "—"}</div>
+                          <div className="text-gray-500">{t.provider_payment_id || "—"}</div>
                         </td>
-                        <td className="p-3 font-mono text-xs break-all">
-                          {t.provider_payment_id || "—"}
-                        </td>
-                        <td className="p-3">{t.provider_status || "—"}</td>
-                        <td className="p-3 text-right">{formatZarFromCents(t.amount_cents)}</td>
-                        <td className="p-3">
+                        <td data-label="Status" className={T.td}>{t.provider_status || "—"}</td>
+                        <td data-label="Amount" className={`${T.td} md:text-right`}>{formatZarFromCents(t.amount_cents)}</td>
+                        <td data-label="Method" className={T.td}>
                           {t.payment_method_brand
                             ? `${t.payment_method_brand}${t.payment_method_last4 ? ` ···${t.payment_method_last4}` : ""}`
                             : t.payment_method_type || "—"}
                         </td>
-                        <td className="p-3">{t.processing_mode || "—"}</td>
-                        <td className="p-3 text-xs text-gray-400">
+                        <td data-label="Mode" className={T.td}>{t.processing_mode || "—"}</td>
+                        <td data-label="Paid / Failed" className={`${T.td} text-xs text-gray-400`}>
                           {t.paid_at ? `paid ${new Date(t.paid_at).toLocaleString()}` : ""}
                           {t.failed_at ? `failed ${new Date(t.failed_at).toLocaleString()}` : ""}
                           {!t.paid_at && !t.failed_at ? "—" : null}

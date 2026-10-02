@@ -155,6 +155,10 @@ A valid one returns `200` and marks the order paid; `--bad-signature` must retur
 - **Live stock counts**: the frontend subscribes to Supabase Realtime `UPDATE` events on the `products` table, so stock counts update live without polling.
 - **No card data is stored**. Only safe metadata (card brand, last 4 digits) from Yoco's payment method details is persisted.
 
+## Order tracking (customers)
+
+Customers track orders at `/track` with their order number (`BS-…`, shown on the payment confirmation) plus the email or phone number they ordered with. The payment success page links straight to `/track/<order id>`. The page shows Order placed → Payment received → Packed → Out for delivery / Ready for collection → Delivered / Collected, driven by the fulfilment status set in admin, plus the courier and tracking number once entered. Unpaid orders get a "Complete payment" link. Wrong details and unknown order numbers get the same "couldn't find" answer.
+
 ## Admin
 
 - **WhatsApp nudges** (Pending tab): each `pending_payment` order gets a Nudge button that opens WhatsApp (`wa.me`) with a reminder to the customer, sent from the shop's own WhatsApp. Two reminders at most (Nudge, then Send final nudge); the message links to `/pay/<order id>`, which reopens Yoco's checkout for that order. Rows show "Fix phone number" if the phone isn't an SA mobile, and "Paid on a later order" if the same customer (same email or same last 9 phone digits) paid a newer order.
@@ -238,6 +242,7 @@ After applying or removing the discount, verify `/admin` shows the expected prod
 - `api/products.ts` — `GET` active products.
 - `api/orders/create.ts` — `POST` create a draft order.
 - `api/orders/[id].ts` — `GET` order status (used by status pages).
+- `api/orders/track.ts` — customer order tracking: `POST { orderNumber, contact }` (email or phone used to order) or `GET ?id=<order uuid>`. Returns status, progress, items, courier/tracking number and suburb/city only — never the street address, phone or email.
 - `api/payments/yoco/create-checkout.ts` — `POST` create a Yoco checkout session.
 - `api/webhooks/yoco.ts` — `POST` raw-body webhook receiver (the only Yoco webhook route).
 - `api/cron/reconcile-payments.ts` — payment reconciliation sweep (`CRON_SECRET`-gated).
