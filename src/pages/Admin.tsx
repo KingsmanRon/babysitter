@@ -70,6 +70,9 @@ type AdminSummary = {
     name: string;
     stock_count: number;
     size_stock?: Record<string, number> | null;
+    // Per size ("" when the product has no sizes): units in paid orders and
+    // units held by unpaid checkouts. Available + sold + held = total.
+    stock_usage?: Record<string, { sold: number; held: number }>;
     price_cents: number;
     currency: string;
     is_active: boolean;
@@ -178,6 +181,16 @@ const saleDraftFromProduct = (product: AdminProduct): ProductSaleDraft => ({
   sale_ends_at: toDatetimeLocal(product.sale_ends_at),
 });
 
+// Available-now numbers as strings for the inputs; "" is the key for a product without sizes.
+const stockDraftFromProduct = (product: AdminProduct): Record<string, string> =>
+  product.size_stock
+    ? Object.fromEntries(Object.entries(product.size_stock).map(([size, n]) => [size, String(n)]))
+    : { "": String(product.stock_count) };
+
+function currentStock(product: AdminProduct, key: string): number {
+  return product.size_stock ? Number(product.size_stock[key] ?? 0) : product.stock_count;
+}
+
 function toDatetimeLocal(value: string | null): string {
   if (!value) return "";
   const date = new Date(value);
@@ -206,6 +219,8 @@ export default function Admin() {
   const [data, setData] = useState<AdminSummary | null>(null);
   const [saleDrafts, setSaleDrafts] = useState<Record<string, ProductSaleDraft>>({});
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
+  const [stockDrafts, setStockDrafts] = useState<Record<string, Record<string, string>>>({});
+  const [savingStockId, setSavingStockId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderFilter, setOrderFilter] = useState("");
@@ -247,6 +262,7 @@ export default function Admin() {
       const json = (await res.json()) as AdminSummary;
       setData(json);
       setSaleDrafts(Object.fromEntries(json.products.map((p) => [p.id, saleDraftFromProduct(p)])));
+      setStockDrafts(Object.fromEntries(json.products.map((p) => [p.id, stockDraftFromProduct(p)])));
       sessionStorage.setItem("admin_token", t);
     } catch (err) {
       setError((err as Error).message);
@@ -304,6 +320,48 @@ export default function Admin() {
       setError((err as Error).message);
     } finally {
       setSavingProductId(null);
+    }
+  };
+
+  const saveStock = async (product: AdminProduct) => {
+    const draft = stockDrafts[product.id] ?? stockDraftFromProduct(product);
+    const changed = Object.keys(draft).filter((key) => draft[key].trim() !== String(currentStock(product, key)));
+    if (!changed.length) return;
+
+    setSavingStockId(product.id);
+    setError(null);
+    try {
+      const values: Record<string, number> = {};
+      for (const key of changed) {
+        const value = draft[key].trim();
+        if (!/^\d+$/.test(value)) throw new Error(`Stock${key ? ` for ${key}` : ""} must be a whole number`);
+        values[key] = Number(value);
+      }
+      const stock = product.size_stock
+        ? {
+            size_stock: values,
+            expected_size_stock: Object.fromEntries(changed.map((key) => [key, currentStock(product, key)])),
+          }
+        : { stock_count: values[""], expected_stock_count: product.stock_count };
+
+      const res = await fetch(`/api/admin/products/${encodeURIComponent(product.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ stock }),
+      });
+      const responseBody = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        // Someone bought or checked out meanwhile: show the fresh numbers.
+        await load(token);
+        setError(responseBody.error || "Stock changed while you were editing. Check the new numbers and save again.");
+        return;
+      }
+      if (!res.ok) throw new Error(responseBody.error || `HTTP ${res.status}`);
+      await load(token);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSavingStockId(null);
     }
   };
 
@@ -508,9 +566,9 @@ export default function Admin() {
                     <tr>
                       <th className={T.th}>Product</th>
                       <th className={`${T.th} md:text-right`}>Price</th>
-                      <th className={`${T.th} md:text-right`}>Stock</th>
+                      <th className={T.th}>Available to sell</th>
                       <th className={T.th}>Active</th>
-                      <th className={`${T.th} w-[55%]`}>Sale</th>
+                      <th className={`${T.th} w-[45%]`}>Sale</th>
                     </tr>
                   </thead>
                   <tbody className={T.tbody}>
@@ -531,13 +589,19 @@ export default function Admin() {
                           <td data-label="Price" className={`${T.td} max-md:col-span-1 md:text-right`}>
                             {formatZarFromCents(p.price_cents)}
                           </td>
-                          <td data-label="Stock" className={`${T.td} max-md:col-span-1 md:text-right font-semibold`}>
-                            {p.stock_count}
-                            {p.size_stock && (
-                              <div className="text-xs font-normal text-gray-500">
-                                {Object.entries(p.size_stock).map(([size, n]) => `${size} ${n}`).join(" · ")}
-                              </div>
-                            )}
+                          <td data-label="Available to sell" className={T.td}>
+                            <StockEditor
+                              product={p}
+                              draft={stockDrafts[p.id] ?? stockDraftFromProduct(p)}
+                              saving={savingStockId === p.id}
+                              onChange={(key, value) =>
+                                setStockDrafts((drafts) => ({
+                                  ...drafts,
+                                  [p.id]: { ...(drafts[p.id] ?? stockDraftFromProduct(p)), [key]: value },
+                                }))
+                              }
+                              onSave={() => saveStock(p)}
+                            />
                           </td>
                           <td data-label="Active" className={T.td}>
                             {p.is_active ? "yes" : "no"}
@@ -959,6 +1023,68 @@ export default function Admin() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// Per-size "available to sell" inputs. Shows sold and held next to each size
+// so the admin can see the total a number will give (e.g. cap M at 10 total).
+function StockEditor({
+  product,
+  draft,
+  saving,
+  onChange,
+  onSave,
+}: {
+  product: AdminProduct;
+  draft: Record<string, string>;
+  saving: boolean;
+  onChange: (key: string, value: string) => void;
+  onSave: () => void;
+}) {
+  const keys = Object.keys(draft);
+  const dirty = keys.some((key) => draft[key].trim() !== String(currentStock(product, key)));
+  return (
+    <div className="space-y-2">
+      {keys.map((key) => {
+        const usage = product.stock_usage?.[key] ?? { sold: 0, held: 0 };
+        const value = draft[key].trim();
+        const valid = /^\d+$/.test(value);
+        const changed = value !== String(currentStock(product, key));
+        const total = valid ? Number(value) + usage.sold + usage.held : null;
+        return (
+          <label key={key || "all"} className="grid grid-cols-[2.5rem_5rem_1fr] items-center gap-2">
+            <span className="font-mono font-bold">{key || "All"}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              step="1"
+              value={draft[key]}
+              onChange={(e) => onChange(key, e.target.value)}
+              aria-label={`Available to sell${key ? `, size ${key}` : ""}`}
+              className={`${INPUT} ${!valid ? "ring-1 ring-red-500" : changed ? "ring-1 ring-amber-500" : ""}`}
+            />
+            <span className="text-xs text-gray-500">
+              {usage.sold} sold{usage.held ? ` · ${usage.held} held` : ""}
+              {total !== null && (
+                <>
+                  {" · "}
+                  <span className={`whitespace-nowrap ${changed ? "font-semibold text-amber-400" : ""}`}>{total} total</span>
+                </>
+              )}
+            </span>
+          </label>
+        );
+      })}
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={!dirty || saving}
+        className="w-full min-h-10 md:min-h-0 px-3 py-1 bg-purple-600 rounded font-semibold disabled:opacity-40"
+      >
+        {saving ? "Saving..." : "Save stock"}
+      </button>
     </div>
   );
 }
