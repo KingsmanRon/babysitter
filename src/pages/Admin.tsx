@@ -125,11 +125,16 @@ const T = {
   table: "w-full text-sm block md:table",
   thead: "hidden md:table-header-group bg-gray-900 text-gray-400",
   tbody: "block md:table-row-group",
-  tr: "block md:table-row border-t border-gray-800 first:border-t-0 md:first:border-t py-2 md:py-0",
+  tr: "grid grid-cols-2 md:table-row border-t border-gray-800 first:border-t-0 md:first:border-t py-2 md:py-0",
   th: "p-3 text-left font-semibold align-bottom",
-  td: "block md:table-cell px-4 py-1.5 md:p-3 align-top break-words before:block before:mb-0.5 before:text-[11px] before:uppercase before:tracking-wide before:text-gray-500 before:content-[attr(data-label)] md:before:content-none",
+  td: "block col-span-2 md:table-cell px-4 py-1.5 md:p-3 align-top break-words before:block before:mb-0.5 before:text-[11px] before:font-normal before:uppercase before:tracking-wide before:text-gray-500 before:content-[attr(data-label)] md:before:content-none",
 };
-const INPUT = "w-full min-w-0 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500";
+// Phones: 40px-tall controls and 16px text (smaller text makes iOS zoom in).
+const TOUCH = "min-h-10 md:min-h-0 text-base md:text-[length:inherit]";
+const INPUT = `w-full min-w-0 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-purple-500 ${TOUCH}`;
+// Half-width cell on phones (two side by side), no label.
+// (max-md: so these win over the full-width defaults in T.td.)
+const HALF = "max-md:col-span-1 max-md:before:content-none";
 
 const PENDING_FILTER = "status=pending";
 
@@ -204,6 +209,23 @@ export default function Admin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderFilter, setOrderFilter] = useState("");
+  // Stock and Transactions start collapsed on phones so orders come first.
+  const [openSections, setOpenSections] = useState(() => {
+    const wide = typeof window === "undefined" || window.matchMedia("(min-width: 768px)").matches;
+    return { stock: wide, transactions: wide };
+  });
+  const toggleSection = (key: "stock" | "transactions") =>
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  const sectionToggle = (key: "stock" | "transactions") => (
+    <button
+      type="button"
+      onClick={() => toggleSection(key)}
+      aria-expanded={openSections[key]}
+      className="md:hidden min-h-10 px-3 rounded-lg border border-gray-700 text-sm text-gray-300"
+    >
+      {openSections[key] ? "Hide" : "Show"}
+    </button>
+  );
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, TrackingDraft>>({});
   const [savingOrderId, setSavingOrderId] = useState<string | null>(null);
   const [nudgeState, setNudgeState] = useState<Record<string, { busy: boolean; error: string | null }>>({});
@@ -351,7 +373,7 @@ export default function Admin() {
     const manualAt = kind === "confirmation" ? o.confirmation_email_manual_at : o.dispatch_email_manual_at;
     const state = emailState[`${kind}:${o.id}`];
     const btn =
-      "px-2 py-1 rounded font-semibold disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300";
+      "min-h-10 md:min-h-0 px-3 md:px-2 py-1 rounded font-semibold disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300";
     return (
       <div className="mt-2 pt-2 border-t border-gray-800 space-y-1.5">
         <div className="text-gray-500 uppercase tracking-wide text-[11px]">{label}</div>
@@ -456,7 +478,7 @@ export default function Admin() {
             placeholder="Admin token"
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
+            className="flex-1 min-w-0 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-base text-white focus:outline-none focus:border-purple-500"
           />
           <button
             onClick={() => load(token)}
@@ -476,8 +498,11 @@ export default function Admin() {
         {data && (
           <>
             <section className="space-y-3">
-              <h2 className="text-xl font-bold">Stock</h2>
-              <div className={T.wrap}>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-bold">Stock</h2>
+                {sectionToggle("stock")}
+              </div>
+              <div className={`${T.wrap} ${openSections.stock ? "" : "hidden md:block"}`}>
                 <table className={T.table}>
                   <thead className={T.thead}>
                     <tr>
@@ -503,10 +528,10 @@ export default function Admin() {
                             <div className="font-semibold">{p.name}</div>
                             <div className="font-mono text-xs text-gray-500">{p.slug}</div>
                           </td>
-                          <td data-label="Price" className={`${T.td} md:text-right`}>
+                          <td data-label="Price" className={`${T.td} max-md:col-span-1 md:text-right`}>
                             {formatZarFromCents(p.price_cents)}
                           </td>
-                          <td data-label="Stock" className={`${T.td} md:text-right font-semibold`}>
+                          <td data-label="Stock" className={`${T.td} max-md:col-span-1 md:text-right font-semibold`}>
                             {p.stock_count}
                             {p.size_stock && (
                               <div className="text-xs font-normal text-gray-500">
@@ -579,7 +604,7 @@ export default function Admin() {
                                   type="button"
                                   onClick={() => saveSaleFields(p.id)}
                                   disabled={savingProductId === p.id}
-                                  className="w-full px-3 py-1 bg-purple-600 rounded font-semibold disabled:opacity-50"
+                                  className="w-full min-h-10 md:min-h-0 px-3 py-1 bg-purple-600 rounded font-semibold disabled:opacity-50"
                                 >
                                   {savingProductId === p.id ? "Saving..." : "Save"}
                                 </button>
@@ -596,11 +621,38 @@ export default function Admin() {
 
             <section className="space-y-3">
               <h2 className="text-xl font-bold">Orders ({data.orders.length})</h2>
+              <label className="md:hidden block">
+                <span className="sr-only">Show orders</span>
+                <select
+                  value={orderFilter}
+                  disabled={loading}
+                  onChange={(e) => {
+                    setOrderFilter(e.target.value);
+                    load(token, e.target.value);
+                  }}
+                  className={`${INPUT} min-h-11 px-3 font-semibold`}
+                >
+                  <optgroup label="Payment">
+                    {PAYMENT_FILTERS.map((f) => (
+                      <option key={f.key || "all"} value={f.key}>
+                        {f.key ? f.label : "All orders"}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Fulfilment (paid orders)">
+                    {FULFILMENT_FILTERS.map((f) => (
+                      <option key={f.key} value={f.key}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </label>
               {[
                 { title: "Payment", filters: PAYMENT_FILTERS },
                 { title: "Fulfilment", filters: FULFILMENT_FILTERS },
               ].map((group) => (
-                <div key={group.title} className="flex flex-wrap items-center gap-2">
+                <div key={group.title} className="hidden md:flex flex-wrap items-center gap-2">
                   <span className="w-20 text-xs uppercase tracking-wide text-gray-500">{group.title}</span>
                   {group.filters.map((f) => (
                     <button
@@ -644,11 +696,11 @@ export default function Admin() {
                   <tbody className={T.tbody}>
                     {data.orders.map((o) => (
                       <tr key={o.id} className={T.tr}>
-                        <td data-label="Order" className={T.td}>
+                        <td data-label="Order" className={`${T.td} ${HALF}`}>
                           <div className="font-mono text-purple-400">{o.order_number}</div>
                           <div className="text-xs text-gray-500">{new Date(o.created_at).toLocaleString()}</div>
                         </td>
-                        <td data-label="Status" className={T.td}>
+                        <td data-label="Status" className={`${T.td} ${HALF} text-right md:text-left`}>
                           <span
                             className={
                               o.status === "paid"
@@ -711,7 +763,7 @@ export default function Admin() {
                                         onClick={() => sendNudge(o.id)}
                                         disabled={state?.busy}
                                         aria-busy={state?.busy || undefined}
-                                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold disabled:opacity-50 disabled:cursor-wait focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
+                                        className="min-h-10 md:min-h-0 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold disabled:opacity-50 disabled:cursor-wait focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
                                       >
                                         {state?.busy ? "Opening…" : count === 0 ? "Nudge" : "Send final nudge"}
                                       </button>
@@ -752,7 +804,7 @@ export default function Admin() {
                             "—"
                           )}
                         </td>
-                        <td data-label="Fulfilment" className={`${T.td} text-xs`}>
+                        <td data-label="Fulfilment" className={`${T.td} text-xs ${o.status === "paid" ? "" : "hidden md:table-cell"}`}>
                           {o.status !== "paid" ? (
                             <span className="text-gray-600">—</span>
                           ) : (
@@ -779,7 +831,7 @@ export default function Admin() {
                                         ...(trackingDrafts[o.id] ?? {}),
                                       })
                                     }
-                                    className={`w-full px-2 py-1 bg-gray-800 border rounded focus:outline-none focus:border-purple-500 disabled:opacity-50 ${
+                                    className={`w-full px-2 py-1 bg-gray-800 border rounded focus:outline-none focus:border-purple-500 disabled:opacity-50 ${TOUCH} ${
                                       done
                                         ? "border-green-700 text-green-400"
                                         : current === "unfulfilled"
@@ -824,7 +876,7 @@ export default function Admin() {
                                               tracking_number: draft.tracking_number,
                                             })
                                           }
-                                          className="px-2 py-1 bg-purple-600 rounded font-semibold disabled:opacity-50"
+                                          className="min-h-10 md:min-h-0 px-3 md:px-2 py-1 bg-purple-600 rounded font-semibold disabled:opacity-50"
                                         >
                                           Save
                                         </button>
@@ -862,8 +914,11 @@ export default function Admin() {
             </section>
 
             <section className="space-y-3">
-              <h2 className="text-xl font-bold">Transactions ({data.transactions.length})</h2>
-              <div className={T.wrap}>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-bold">Transactions ({data.transactions.length})</h2>
+                {sectionToggle("transactions")}
+              </div>
+              <div className={`${T.wrap} ${openSections.transactions ? "" : "hidden md:block"}`}>
                 <table className={T.table}>
                   <thead className={T.thead}>
                     <tr>
@@ -882,14 +937,14 @@ export default function Admin() {
                           <div>{t.provider_checkout_id || "—"}</div>
                           <div className="text-gray-500">{t.provider_payment_id || "—"}</div>
                         </td>
-                        <td data-label="Status" className={T.td}>{t.provider_status || "—"}</td>
-                        <td data-label="Amount" className={`${T.td} md:text-right`}>{formatZarFromCents(t.amount_cents)}</td>
-                        <td data-label="Method" className={T.td}>
+                        <td data-label="Status" className={`${T.td} max-md:col-span-1`}>{t.provider_status || "—"}</td>
+                        <td data-label="Amount" className={`${T.td} max-md:col-span-1 md:text-right`}>{formatZarFromCents(t.amount_cents)}</td>
+                        <td data-label="Method" className={`${T.td} max-md:col-span-1`}>
                           {t.payment_method_brand
                             ? `${t.payment_method_brand}${t.payment_method_last4 ? ` ···${t.payment_method_last4}` : ""}`
                             : t.payment_method_type || "—"}
                         </td>
-                        <td data-label="Mode" className={T.td}>{t.processing_mode || "—"}</td>
+                        <td data-label="Mode" className={`${T.td} max-md:col-span-1`}>{t.processing_mode || "—"}</td>
                         <td data-label="Paid / Failed" className={`${T.td} text-xs text-gray-400`}>
                           {t.paid_at ? `paid ${new Date(t.paid_at).toLocaleString()}` : ""}
                           {t.failed_at ? `failed ${new Date(t.failed_at).toLocaleString()}` : ""}
