@@ -1,11 +1,16 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { sendDispatchEmail, type SendResult } from "../../../lib/confirmationEmail.js";
 import { buildFulfilmentUpdate, type FulfilmentInput } from "../../../lib/fulfilment.js";
 import { log } from "../../../lib/logger.js";
 import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
 
 const ALLOWED_FIELDS = new Set(["fulfilment_status", "courier", "tracking_number"]);
 const RETURN_COLUMNS =
-  "id, order_number, status, fulfilment_method, fulfilment_status, courier, tracking_number, dispatched_at, delivered_at, fulfilment_updated_at";
+  "id, order_number, status, fulfilment_method, fulfilment_status, courier, tracking_number, dispatched_at, delivered_at, fulfilment_updated_at, dispatch_email_sent_at, dispatch_email_error";
+
+// Moving an order to one of these emails the customer ("on its way" /
+// "ready for collection"), once.
+const DISPATCH_EMAIL_STEPS = ["out_for_delivery", "ready_for_collection"];
 
 function unauthorized(res: VercelResponse) {
   return res.status(401).json({ error: "Unauthorized" });
@@ -47,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const db = supabaseAdmin();
     const { data: order, error: readErr } = await db
       .from("orders")
-      .select("id, status, fulfilment_method, dispatched_at, delivered_at")
+      .select("id, status, fulfilment_method, fulfilment_status, dispatched_at, delivered_at, dispatch_email_sent_at")
       .eq("id", id)
       .maybeSingle();
     if (readErr) throw readErr;
@@ -75,7 +80,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       orderId: id,
       fulfilmentStatus: updated.fulfilment_status,
     });
-    return res.status(200).json({ order: updated });
+
+    // Email the customer on the step change, unless they already got it
+    // (moving back and forth doesn't resend; admin can Resend explicitly).
+    let dispatchEmail: SendResult | null = null;
+    if (
+      DISPATCH_EMAIL_STEPS.includes(updated.fulfilment_status) &&
+      order.fulfilment_status !== updated.fulfilment_status &&
+      !order.dispatch_email_sent_at
+    ) {
+      dispatchEmail = await sendDispatchEmail(id);
+      if (dispatchEmail.status === "sent") {
+        updated.dispatch_email_sent_at = dispatchEmail.sentAt;
+        updated.dispatch_email_error = null;
+      } else if (dispatchEmail.status === "failed") {
+        updated.dispatch_email_error = dispatchEmail.error;
+      }
+    }
+    return res.status(200).json({ order: updated, dispatchEmail });
   } catch (err) {
     log.error("api.admin.orders.update.error", { orderId: id, err: (err as Error).message });
     return res.status(500).json({ error: "Failed to update order" });

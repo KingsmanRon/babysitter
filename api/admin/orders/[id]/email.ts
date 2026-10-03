@@ -1,10 +1,12 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
-  buildConfirmationEmail,
-  confirmationMailto,
-  EMAIL_ORDER_COLUMNS,
-  sendOrderConfirmation,
-  type EmailItem,
+  buildOrderEmail,
+  emailBlockedReason,
+  emailColumns,
+  emailMailto,
+  loadEmailOrder,
+  sendOrderEmail,
+  type EmailKind,
 } from "../../../../lib/confirmationEmail.js";
 import { log } from "../../../../lib/logger.js";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin.js";
@@ -20,9 +22,12 @@ function parseOrderId(req: VercelRequest): string | null {
 }
 
 // POST /api/admin/orders/:id/email
-//   { mode: "send" }   — (re)send the branded confirmation email now.
-//   { mode: "manual" } — return a mailto: link with the plain-text version for
-//                        the admin's own mail app (fallback), and note it.
+//   { mode: "send", kind? }   — (re)send the email now through the email service.
+//   { mode: "manual", kind? } — return a mailto: link with the plain-text
+//                               version for the admin's own mail app
+//                               (fallback), and note it.
+// kind is "confirmation" (default) or "dispatch" (on its way / ready for
+// collection).
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -39,32 +44,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const id = parseOrderId(req);
   if (!id) return res.status(400).json({ error: "Order id is required" });
-  const mode = (req.body as { mode?: unknown } | undefined)?.mode;
+  const { mode, kind: rawKind } = (req.body ?? {}) as { mode?: unknown; kind?: unknown };
   if (mode !== "send" && mode !== "manual") {
     return res.status(400).json({ error: 'mode must be "send" or "manual"' });
   }
+  const kind: EmailKind | null = rawKind === undefined || rawKind === "confirmation" ? "confirmation" : rawKind === "dispatch" ? "dispatch" : null;
+  if (!kind) return res.status(400).json({ error: 'kind must be "confirmation" or "dispatch"' });
 
   try {
     const db = supabaseAdmin();
-    const { data: order, error } = await db.from("orders").select(EMAIL_ORDER_COLUMNS).eq("id", id).maybeSingle();
-    if (error) throw error;
-    if (!order) return res.status(404).json({ reason: "not_found", error: "Order not found" });
-    if (order.status !== "paid") {
-      return res.status(409).json({ reason: "not_paid", error: "Only paid orders get a confirmation email" });
+    const loaded = await loadEmailOrder(id);
+    if (!loaded) return res.status(404).json({ reason: "not_found", error: "Order not found" });
+    const blocked = emailBlockedReason(kind, loaded.order);
+    if (blocked === "not_paid") {
+      return res.status(409).json({ reason: blocked, error: "Only paid orders get customer emails" });
     }
-    if (!order.customer_email?.trim()) {
+    if (blocked === "not_dispatched") {
+      return res
+        .status(409)
+        .json({ reason: blocked, error: "Mark the order Out for delivery or Ready for collection first" });
+    }
+    if (!loaded.order.customer_email?.trim()) {
       return res.status(422).json({ reason: "no_email", error: "This order has no email address" });
     }
 
     if (mode === "manual") {
-      const { data: items } = await db.from("order_items").select("product_name, size, quantity").eq("order_id", id);
-      const email = buildConfirmationEmail(order, (items || []) as EmailItem[])!;
+      const email = buildOrderEmail(kind, loaded.order, loaded.items)!;
       const manualAt = new Date().toISOString();
-      await db.from("orders").update({ confirmation_email_manual_at: manualAt }).eq("id", id);
-      return res.status(200).json({ mailto: confirmationMailto(email), manualAt });
+      await db.from("orders").update({ [emailColumns(kind).manualAt]: manualAt }).eq("id", id);
+      return res.status(200).json({ mailto: emailMailto(email), manualAt });
     }
 
-    const result = await sendOrderConfirmation(id, { resend: true });
+    const result = await sendOrderEmail(id, kind, { resend: true });
     if (result.status === "sent") {
       return res.status(200).json({ sentAt: result.sentAt, emailId: result.emailId });
     }

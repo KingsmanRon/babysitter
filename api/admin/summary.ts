@@ -52,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let ordersQuery = db
       .from("orders")
       .select(
-        "id, order_number, status, amount_cents, currency, customer_email, customer_name, fulfilment_method, delivery_fee_cents, ship_phone, ship_line1, ship_line2, ship_suburb, ship_city, ship_province, ship_postal_code, metadata, fulfilment_status, courier, tracking_number, dispatched_at, delivered_at, nudge_count, last_nudged_at, superseded_by, cancel_reason, confirmation_email_sent_at, confirmation_email_error, confirmation_email_manual_at, created_at, updated_at",
+        "id, order_number, status, amount_cents, currency, customer_email, customer_name, fulfilment_method, delivery_fee_cents, ship_phone, ship_line1, ship_line2, ship_suburb, ship_city, ship_province, ship_postal_code, metadata, fulfilment_status, courier, tracking_number, dispatched_at, delivered_at, nudge_count, last_nudged_at, superseded_by, cancel_reason, confirmation_email_sent_at, confirmation_email_error, confirmation_email_manual_at, dispatch_email_sent_at, dispatch_email_error, dispatch_email_manual_at, created_at, updated_at",
       );
     if (statuses) ordersQuery = ordersQuery.in("status", statuses);
     if (fulfilmentSteps) ordersQuery = ordersQuery.in("fulfilment_status", fulfilmentSteps);

@@ -43,6 +43,9 @@ type AdminSummary = {
     confirmation_email_sent_at?: string | null;
     confirmation_email_error?: string | null;
     confirmation_email_manual_at?: string | null;
+    dispatch_email_sent_at?: string | null;
+    dispatch_email_error?: string | null;
+    dispatch_email_manual_at?: string | null;
     created_at: string;
   }>;
   transactions: Array<{
@@ -110,6 +113,10 @@ const DELIVERY_STEPS = ["unfulfilled", "packed", "out_for_delivery", "delivered"
 const COLLECTION_STEPS = ["unfulfilled", "packed", "ready_for_collection", "collected"];
 
 type TrackingDraft = { courier: string; tracking_number: string };
+type AdminOrder = AdminSummary["orders"][number];
+type EmailKind = "confirmation" | "dispatch";
+// Steps at which the customer has had (or can be sent) the dispatch email.
+const DISPATCHED_STEPS = ["out_for_delivery", "ready_for_collection", "delivered", "collected"];
 
 // Admin tables never scroll sideways: below md each row stacks into a card,
 // with every cell labelled from its data-label attribute.
@@ -287,10 +294,12 @@ export default function Admin() {
         headers: { "Content-Type": "application/json", "x-admin-token": token },
         body: JSON.stringify(body),
       });
+      const responseBody = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const responseBody = await res.json().catch(() => ({}));
         throw new Error(responseBody.error || `HTTP ${res.status}`);
       }
+      // Marking Out for delivery / Ready for collection emails the customer; a
+      // failure shows on the order's "On its way email" block after the reload.
       setTrackingDrafts((prev) => {
         const next = { ...prev };
         delete next[orderId];
@@ -304,15 +313,16 @@ export default function Admin() {
     }
   };
 
-  // Confirmation email: "send" goes out through the email service; "manual"
+  // Customer emails: "send" goes out through the email service; "manual"
   // opens the admin's own mail app with the plain-text version (fallback).
-  const confirmationEmail = async (orderId: string, mode: "send" | "manual") => {
-    setEmailState((prev) => ({ ...prev, [orderId]: { busy: mode, error: null } }));
+  const orderEmail = async (orderId: string, kind: EmailKind, mode: "send" | "manual") => {
+    const key = `${kind}:${orderId}`;
+    setEmailState((prev) => ({ ...prev, [key]: { busy: mode, error: null } }));
     try {
       const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/email`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-admin-token": token },
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ mode, kind }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
@@ -324,15 +334,67 @@ export default function Admin() {
             o.id !== orderId
               ? o
               : mode === "manual"
-                ? { ...o, confirmation_email_manual_at: body.manualAt }
-                : { ...o, confirmation_email_sent_at: body.sentAt, confirmation_email_error: null },
+                ? { ...o, [`${kind}_email_manual_at`]: body.manualAt }
+                : { ...o, [`${kind}_email_sent_at`]: body.sentAt, [`${kind}_email_error`]: null },
           ),
         },
       );
-      setEmailState((prev) => ({ ...prev, [orderId]: { busy: null, error: null } }));
+      setEmailState((prev) => ({ ...prev, [key]: { busy: null, error: null } }));
     } catch (err) {
-      setEmailState((prev) => ({ ...prev, [orderId]: { busy: null, error: (err as Error).message } }));
+      setEmailState((prev) => ({ ...prev, [key]: { busy: null, error: (err as Error).message } }));
     }
+  };
+
+  const renderEmailBlock = (o: AdminOrder, kind: EmailKind, label: string) => {
+    const sentAt = kind === "confirmation" ? o.confirmation_email_sent_at : o.dispatch_email_sent_at;
+    const failed = kind === "confirmation" ? o.confirmation_email_error : o.dispatch_email_error;
+    const manualAt = kind === "confirmation" ? o.confirmation_email_manual_at : o.dispatch_email_manual_at;
+    const state = emailState[`${kind}:${o.id}`];
+    const btn =
+      "px-2 py-1 rounded font-semibold disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300";
+    return (
+      <div className="mt-2 pt-2 border-t border-gray-800 space-y-1.5">
+        <div className="text-gray-500 uppercase tracking-wide text-[11px]">{label}</div>
+        {!o.customer_email ? (
+          <div className="text-amber-400">No email address</div>
+        ) : (
+          <>
+            {sentAt ? (
+              <div className="text-green-400">✓ Sent {timeAgo(sentAt)}</div>
+            ) : failed ? (
+              <div className="text-red-400">Not sent: {failed}</div>
+            ) : (
+              <div className="text-gray-400">Not sent</div>
+            )}
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                disabled={!!state?.busy || !data?.emailConfigured}
+                title={data?.emailConfigured ? undefined : "Email sending isn't set up yet (RESEND_API_KEY)"}
+                onClick={() => orderEmail(o.id, kind, "send")}
+                className={`${btn} bg-purple-600 hover:bg-purple-500`}
+              >
+                {state?.busy === "send" ? "Sending…" : sentAt ? "Resend" : "Send email"}
+              </button>
+              <button
+                type="button"
+                disabled={!!state?.busy}
+                onClick={() => orderEmail(o.id, kind, "manual")}
+                className={`${btn} border border-gray-700 text-gray-200 hover:border-gray-500`}
+              >
+                {state?.busy === "manual" ? "Opening…" : "Email manually"}
+              </button>
+            </div>
+            {manualAt && <div className="text-gray-500">Opened manually {timeAgo(manualAt)}</div>}
+            {state?.error && (
+              <div role="alert" className="text-red-400">
+                {state.error}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
   };
 
   const sendNudge = async (orderId: string) => {
@@ -709,7 +771,14 @@ export default function Admin() {
                                   <select
                                     value={current}
                                     disabled={saving}
-                                    onChange={(e) => updateFulfilment(o.id, { fulfilment_status: e.target.value })}
+                                    onChange={(e) =>
+                                      updateFulfilment(o.id, {
+                                        fulfilment_status: e.target.value,
+                                        // Save typed courier/tracking with the step, so the
+                                        // "on its way" email includes them.
+                                        ...(trackingDrafts[o.id] ?? {}),
+                                      })
+                                    }
                                     className={`w-full px-2 py-1 bg-gray-800 border rounded focus:outline-none focus:border-purple-500 disabled:opacity-50 ${
                                       done
                                         ? "border-green-700 text-green-400"
@@ -762,6 +831,11 @@ export default function Admin() {
                                       )}
                                     </div>
                                   )}
+                                  {!isCollection && (current === "unfulfilled" || current === "packed") && (
+                                    <div className="text-gray-500">
+                                      Add courier &amp; tracking, then choose Out for delivery: the customer is emailed then.
+                                    </div>
+                                  )}
                                   {o.dispatched_at && (
                                     <div className="text-gray-500">
                                       {isCollection ? "Ready" : "Sent"} {new Date(o.dispatched_at).toLocaleString()}
@@ -772,56 +846,9 @@ export default function Admin() {
                                       {isCollection ? "Collected" : "Delivered"} {new Date(o.delivered_at).toLocaleString()}
                                     </div>
                                   )}
-                                  <div className="mt-2 pt-2 border-t border-gray-800 space-y-1.5">
-                                    <div className="text-gray-500 uppercase tracking-wide text-[11px]">Confirmation email</div>
-                                    {!o.customer_email ? (
-                                      <div className="text-amber-400">No email address</div>
-                                    ) : (
-                                      (() => {
-                                        const state = emailState[o.id];
-                                        const btn =
-                                          "px-2 py-1 rounded font-semibold disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300";
-                                        return (
-                                          <>
-                                            {o.confirmation_email_sent_at ? (
-                                              <div className="text-green-400">✓ Sent {timeAgo(o.confirmation_email_sent_at)}</div>
-                                            ) : o.confirmation_email_error ? (
-                                              <div className="text-red-400">Not sent: {o.confirmation_email_error}</div>
-                                            ) : (
-                                              <div className="text-gray-400">Not sent</div>
-                                            )}
-                                            <div className="flex flex-wrap gap-1">
-                                              <button
-                                                type="button"
-                                                disabled={!!state?.busy || !data.emailConfigured}
-                                                title={data.emailConfigured ? undefined : "Email sending isn't set up yet (RESEND_API_KEY)"}
-                                                onClick={() => confirmationEmail(o.id, "send")}
-                                                className={`${btn} bg-purple-600 hover:bg-purple-500`}
-                                              >
-                                                {state?.busy === "send" ? "Sending…" : o.confirmation_email_sent_at ? "Resend" : "Send email"}
-                                              </button>
-                                              <button
-                                                type="button"
-                                                disabled={!!state?.busy}
-                                                onClick={() => confirmationEmail(o.id, "manual")}
-                                                className={`${btn} border border-gray-700 text-gray-200 hover:border-gray-500`}
-                                              >
-                                                {state?.busy === "manual" ? "Opening…" : "Email manually"}
-                                              </button>
-                                            </div>
-                                            {o.confirmation_email_manual_at && (
-                                              <div className="text-gray-500">Opened manually {timeAgo(o.confirmation_email_manual_at)}</div>
-                                            )}
-                                            {state?.error && (
-                                              <div role="alert" className="text-red-400">
-                                                {state.error}
-                                              </div>
-                                            )}
-                                          </>
-                                        );
-                                      })()
-                                    )}
-                                  </div>
+                                  {renderEmailBlock(o, "confirmation", "Confirmation email")}
+                                  {(DISPATCHED_STEPS.includes(current) || o.dispatch_email_sent_at) &&
+                                    renderEmailBlock(o, "dispatch", isCollection ? "Ready for collection email" : "On its way email")}
                                 </div>
                               );
                             })()
