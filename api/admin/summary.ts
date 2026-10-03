@@ -4,6 +4,7 @@ import { log } from "../../lib/logger.js";
 import { findSupersedingOrder, normaliseSaPhone, type CustomerOrder } from "../../lib/nudge.js";
 import { CUSTOMER_COLUMNS } from "../../lib/supersede.js";
 import { emailSendingConfigured } from "../../lib/confirmationEmail.js";
+import { tallyStockUsage } from "../../lib/adminStock.js";
 
 // Admin filter name -> order statuses it covers.
 const STATUS_FILTERS: Record<string, string[]> = {
@@ -111,11 +112,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select("id, slug, name, stock_count, size_stock, price_cents, currency, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at")
       .order("created_at", { ascending: true });
 
+    // Units sold and held at checkout per product and size, so the stock
+    // table can show the full picture: sold + held + available = total.
+    const [{ data: soldOrders }, { data: heldOrders }] = await Promise.all([
+      db.from("orders").select("id, status, stock_state").eq("status", "paid").limit(5000),
+      db.from("orders").select("id, status, stock_state").eq("stock_state", "reserved").limit(5000),
+    ]);
+    const usageOrders = [...(soldOrders || []), ...(heldOrders || [])];
+    const usageIds = [...new Set(usageOrders.map((o) => o.id))];
+    const usageItems: Array<{ order_id: string; product_id: string | null; size: string | null; quantity: number }> = [];
+    // Chunked so the id list stays within URL limits.
+    for (let i = 0; i < usageIds.length; i += 150) {
+      const { data } = await db
+        .from("order_items")
+        .select("order_id, product_id, size, quantity")
+        .in("order_id", usageIds.slice(i, i + 150));
+      usageItems.push(...(data || []));
+    }
+    const stockUsage = tallyStockUsage(usageOrders, usageItems);
+
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
       orders: orders.map((o) => ({ ...o, items: itemsByOrder.get(o.id) ?? [] })),
       transactions: txs || [],
-      products: products || [],
+      products: (products || []).map((p) => ({ ...p, stock_usage: stockUsage[p.id] ?? {} })),
       emailConfigured: emailSendingConfigured(),
     });
   } catch (err) {

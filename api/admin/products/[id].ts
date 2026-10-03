@@ -1,6 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { log } from "../../../lib/logger.js";
 import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
+import { planStockUpdate, StockConflictError, validateStockEdit, type StockEdit } from "../../../lib/adminStock.js";
+
+const PRODUCT_COLUMNS =
+  "id, slug, name, stock_count, size_stock, price_cents, currency, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at";
 
 const SALE_FIELDS = [
   "compare_at_price_cents",
@@ -94,6 +98,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = parseProductId(req);
   if (!id) return res.status(400).json({ error: "Product id is required" });
 
+  // { stock: {...} } edits stock on its own; anything else is a sale update.
+  const body = req.body as Record<string, unknown> | null;
+  if (body && typeof body === "object" && "stock" in body) {
+    if (Object.keys(body).length !== 1) {
+      return res.status(400).json({ error: "Send stock on its own, without sale fields" });
+    }
+    let edit: StockEdit;
+    try {
+      edit = validateStockEdit(body.stock);
+    } catch (err) {
+      return res.status(400).json({ error: (err as Error).message });
+    }
+    return updateStock(res, id, edit);
+  }
+
   let update: SaleUpdate;
   try {
     update = validateBody(req.body);
@@ -107,9 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from("products")
       .update(update)
       .eq("id", id)
-      .select(
-        "id, slug, name, stock_count, size_stock, price_cents, currency, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at",
-      )
+      .select(PRODUCT_COLUMNS)
       .single();
 
     if (error) {
@@ -121,5 +138,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err) {
     log.error("api.admin.products.update.error", { err: (err as Error).message, productId: id });
     return res.status(500).json({ error: "Failed to update product" });
+  }
+}
+
+// Checkouts and payments change stock concurrently, so the write only lands if
+// the product row is unchanged since we read it (updated_at moves on every
+// update). If something else got in first, re-read and re-check: a change to
+// a size the admin is editing is a conflict, a change to another size isn't.
+async function updateStock(res: VercelResponse, id: string, edit: StockEdit) {
+  try {
+    const db = supabaseAdmin();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const { data: current, error: readError } = await db
+        .from("products")
+        .select("id, stock_count, size_stock, updated_at")
+        .eq("id", id)
+        .maybeSingle();
+      if (readError) throw new Error(readError.message);
+      if (!current) return res.status(404).json({ error: "Product not found" });
+
+      let next;
+      try {
+        next = planStockUpdate(current, edit);
+      } catch (err) {
+        const status = err instanceof StockConflictError ? 409 : 400;
+        return res.status(status).json({ error: (err as Error).message });
+      }
+
+      const { data, error } = await db
+        .from("products")
+        .update(next)
+        .eq("id", id)
+        .eq("updated_at", current.updated_at)
+        .select(PRODUCT_COLUMNS)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (data) {
+        log.info("api.admin.products.stock_updated", {
+          productId: id,
+          from: { stock_count: current.stock_count, size_stock: current.size_stock },
+          to: next,
+        });
+        return res.status(200).json({ product: data });
+      }
+    }
+    return res.status(409).json({ error: "Stock is changing quickly right now. Reload and try again." });
+  } catch (err) {
+    log.error("api.admin.products.stock_update.error", { err: (err as Error).message, productId: id });
+    return res.status(500).json({ error: "Failed to update stock" });
   }
 }
