@@ -57,6 +57,39 @@ const scrollToId = (id: string) => {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
+const INSTAGRAM_URL = 'https://www.instagram.com/babysitter_bs/?hl=en';
+const WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb6wcCeLCoWwT54KMn01';
+
+// Every unit is gone (paid or held at checkout). Held units come back if
+// their checkout lapses, and realtime stock updates flip this back.
+const isSoldOut = (product: Product | null) =>
+  !!product &&
+  (product.stock_count <= 0 ||
+    (!!product.size_stock && Object.values(product.size_stock).every((n) => Number(n) <= 0)));
+
+// Rubber stamp slammed onto a photo: double ink border, slight tilt.
+const SoldOutStamp = ({ reduce, className }: { reduce: boolean; className?: string }) => (
+  <motion.div
+    aria-hidden="true"
+    initial={reduce ? false : { opacity: 0, scale: 1.8, rotate: -4 }}
+    whileInView={{ opacity: 1, scale: 1, rotate: -14 }}
+    viewport={{ once: true }}
+    transition={{ type: 'spring', stiffness: 260, damping: 16, delay: 0.15 }}
+    style={{ rotate: -14 }}
+    className={cn(
+      'pointer-events-none select-none border-[5px] sm:border-[6px] border-[#ff3b1f] p-1 sm:p-1.5 text-[#ff3b1f] bg-[#f4f2ee]/10',
+      className,
+    )}
+  >
+    <div className="border-2 border-[#ff3b1f] px-4 sm:px-6 pt-2 pb-1.5 text-center">
+      <p className="font-anton uppercase leading-[0.85] text-5xl sm:text-7xl tracking-wide whitespace-nowrap">Sold out</p>
+      <p className="mt-1.5 font-jbmono font-bold uppercase text-[9px] sm:text-[11px] tracking-[0.3em] whitespace-nowrap">
+        S’milano ✶ Thank you
+      </p>
+    </div>
+  </motion.div>
+);
+
 // ──────────────────────────────────────────────────────────────
 // Chrome
 // ──────────────────────────────────────────────────────────────
@@ -68,7 +101,7 @@ const Grain = () => (
   />
 );
 
-const TopBar = ({ onQueue, priceLabel }: { onQueue: () => void; priceLabel: string }) => (
+const TopBar = ({ onQueue, priceLabel, soldOut }: { onQueue: () => void; priceLabel: string; soldOut: boolean }) => (
   <header className="fixed top-0 inset-x-0 z-50 text-white mix-blend-difference">
     <div className="flex items-center justify-between gap-3 px-4 sm:px-8 py-4">
       <Link
@@ -92,7 +125,7 @@ const TopBar = ({ onQueue, priceLabel }: { onQueue: () => void; priceLabel: stri
           onClick={() => scrollToId('cop')}
           className="px-3 sm:px-4 py-2 rounded-full border border-white/80 font-jbmono text-[11px] sm:text-xs uppercase tracking-widest hover:bg-white hover:text-black transition-colors"
         >
-          Cop · {priceLabel}
+          {soldOut ? 'Sold out' : `Cop · ${priceLabel}`}
         </button>
       </div>
     </div>
@@ -116,7 +149,12 @@ const PriceBadge = ({ label, reduce }: { label: string; reduce: boolean }) => (
         <textPath href="#smilano-badge-circle">S’MILANO SAVED MY LIFE ✶ VAAL ✶ PTA ✶ </textPath>
       </text>
     </motion.svg>
-    <span className="absolute inset-0 flex items-center justify-center font-anton text-3xl sm:text-4xl text-[#0b0b0b]">
+    <span
+      className={cn(
+        'absolute inset-0 flex items-center justify-center text-center font-anton uppercase text-[#0b0b0b]',
+        label.includes(' ') ? 'text-2xl sm:text-3xl leading-[0.9] px-8' : 'text-3xl sm:text-4xl',
+      )}
+    >
       {label}
     </span>
   </div>
@@ -125,7 +163,7 @@ const PriceBadge = ({ label, reduce }: { label: string; reduce: boolean }) => (
 // ──────────────────────────────────────────────────────────────
 // 01 — Hero: the slogan pulls apart as you scroll
 // ──────────────────────────────────────────────────────────────
-const Hero = ({ priceLabel, reduce }: { priceLabel: string; reduce: boolean }) => {
+const Hero = ({ priceLabel, soldOut, reduce }: { priceLabel: string; soldOut: boolean; reduce: boolean }) => {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
   const xLeft = useTransform(scrollYProgress, [0, 1], ['0%', '-38%']);
@@ -169,13 +207,18 @@ const Hero = ({ priceLabel, reduce }: { priceLabel: string; reduce: boolean }) =
               <span aria-hidden="true" className="absolute -top-3 left-6 w-20 h-6 bg-[#f1e7c9]/80 -rotate-6 shadow-sm" />
               <span aria-hidden="true" className="absolute -top-3 right-8 w-16 h-6 bg-[#f1e7c9]/80 rotate-3 shadow-sm" />
               <img src={SHIRT_IMAGE} alt="Black S’MILANO SAVED MY LIFE t-shirt with oversized cracked white print" className="w-full h-auto" />
+              {soldOut && (
+                <div className="absolute inset-0 flex items-center justify-center scale-[0.7] sm:scale-90">
+                  <SoldOutStamp reduce={reduce} className="bg-[#f4f2ee]/75" />
+                </div>
+              )}
               <figcaption className="absolute bottom-3 sm:bottom-4 left-4 right-4 flex justify-between font-jbmono text-[10px] sm:text-xs uppercase tracking-widest text-[#0b0b0b]/70">
                 <span>Fig. 01 — The tee</span>
                 <span className="hidden sm:inline">Black / White</span>
               </figcaption>
             </motion.div>
             <div className="absolute -right-10 -bottom-10 sm:-right-16 sm:-bottom-12 pointer-events-auto">
-              <PriceBadge label={priceLabel} reduce={reduce} />
+              <PriceBadge label={soldOut ? 'Sold out' : priceLabel} reduce={reduce} />
             </div>
           </motion.figure>
         </div>
@@ -185,7 +228,7 @@ const Hero = ({ priceLabel, reduce }: { priceLabel: string; reduce: boolean }) =
           className="absolute bottom-6 inset-x-4 sm:inset-x-8 z-20 flex items-end justify-between font-jbmono text-[10px] sm:text-xs uppercase tracking-[0.2em] text-[#0b0b0b]"
         >
           <div className="space-y-1">
-            <p>New drop</p>
+            <p className={soldOut ? 'text-[#c62a12] font-bold' : undefined}>{soldOut ? 'Sold out — thank you' : 'New drop'}</p>
             <p className="text-[#0b0b0b]/60">Vaal ⟶ Pretoria ⟶ Everywhere</p>
           </div>
           <div className="flex items-center gap-2">
@@ -234,11 +277,13 @@ const VelocityMarquee = ({ children, baseVelocity, reduce }: { children: React.R
   );
 };
 
-const MarqueeBand = ({ reduce }: { reduce: boolean }) => (
+const MarqueeBand = ({ soldOut, reduce }: { soldOut: boolean; reduce: boolean }) => (
   <section aria-label="S’milano marquee" className="relative z-20 bg-[#0b0b0b] py-6 sm:py-10 -mt-[1px] overflow-hidden">
     <div className="-rotate-2 scale-[1.04] bg-[#ff3b1f] py-3 sm:py-4 text-[#0b0b0b] font-anton uppercase text-4xl sm:text-6xl tracking-wide">
       <VelocityMarquee baseVelocity={-3} reduce={reduce}>
-        S’milano saved my life ✶ High-velocity ✶ Vaal ✶ Pretoria ✶ Urban peripheries ✶
+        {soldOut
+          ? 'Sold out ✶ Thank you ✶ S’milano saved my life ✶ Sold out ✶ Vaal ✶ Pretoria ✶ '
+          : 'S’milano saved my life ✶ High-velocity ✶ Vaal ✶ Pretoria ✶ Urban peripheries ✶ '}
       </VelocityMarquee>
     </div>
     <div className="rotate-1 mt-3 sm:mt-4 text-[#d9d5cf] font-jbmono uppercase text-xs sm:text-sm tracking-[0.3em]">
@@ -549,21 +594,22 @@ const Soundtrack = ({ playing, onPlay, onStop, reduce }: SoundtrackProps) => {
 // ──────────────────────────────────────────────────────────────
 interface CopSectionProps {
   product: Product | null;
+  soldOut: boolean;
+  reduce: boolean;
   loading: boolean;
   priceCents: number;
   deliveryFeeCents: number;
   onCheckout: (size: string, fulfilment: FulfilmentMethod) => void;
 }
 
-const CopSection = ({ product, loading, priceCents, deliveryFeeCents, onCheckout }: CopSectionProps) => {
+const CopSection = ({ product, soldOut, reduce, loading, priceCents, deliveryFeeCents, onCheckout }: CopSectionProps) => {
   const [size, setSize] = useState<string | null>(null);
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>('delivery');
   const [activeImage, setActiveImage] = useState(0);
 
   const images = product && product.images.length > 0 ? product.images : [SHIRT_IMAGE, CREW_IMAGE];
   const sizes = product && product.sizes.length > 0 ? product.sizes : FALLBACK_SIZES;
-  const available = !!product && product.stock_count > 0;
-  const soldOut = !!product && product.stock_count <= 0;
+  const available = !!product && !soldOut;
   const totalCents = priceCents + (fulfilment === 'delivery' ? deliveryFeeCents : 0);
   // Units left in a size, or null when the product only tracks a total.
   const sizeLeft = (s: string) => (product?.size_stock ? product.size_stock[s] ?? 0 : null);
@@ -620,9 +666,14 @@ const CopSection = ({ product, loading, priceCents, deliveryFeeCents, onCheckout
                   className="absolute inset-0 w-full h-full object-contain"
                 />
               </AnimatePresence>
-              <span className="absolute top-4 left-4 px-3 py-1 bg-[#ff3b1f] font-jbmono text-[10px] sm:text-xs font-bold uppercase tracking-widest">
+              <span className="absolute z-10 top-4 left-4 px-3 py-1 bg-[#ff3b1f] font-jbmono text-[10px] sm:text-xs font-bold uppercase tracking-widest">
                 {soldOut ? 'Sold out' : 'New drop'}
               </span>
+              {soldOut && (
+                <div className="absolute inset-0 flex items-center justify-center bg-[#f4f2ee]/35">
+                  <SoldOutStamp reduce={reduce} className="bg-[#f4f2ee]/80" />
+                </div>
+              )}
             </div>
             {images.length > 1 && (
               <div className="grid grid-cols-4 gap-3 mt-3">
@@ -673,14 +724,29 @@ const CopSection = ({ product, loading, priceCents, deliveryFeeCents, onCheckout
                       onClick={() => setSize(s)}
                       disabled={out}
                       aria-pressed={size === s}
-                      aria-label={out && available ? `${s}, sold out` : s}
+                      aria-label={out ? `${s}, sold out` : s}
                       className={cn(
-                        'py-4 font-anton text-xl border-2 border-[#0b0b0b] transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
-                        out && available && 'line-through',
-                        size === s ? 'bg-[#0b0b0b] text-[#f4f2ee]' : 'hover:bg-[#0b0b0b]/5',
+                        'relative overflow-hidden py-3 min-h-[4.25rem] flex flex-col items-center justify-center font-anton text-xl border-2 border-[#0b0b0b] transition-colors disabled:cursor-not-allowed',
+                        out && 'border-[#0b0b0b]/25 text-[#0b0b0b]/35',
+                        size === s ? 'bg-[#0b0b0b] text-[#f4f2ee]' : !out && 'hover:bg-[#0b0b0b]/5',
                       )}
                     >
-                      {s}
+                      {out && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-0"
+                          style={{
+                            background:
+                              'linear-gradient(to top right, transparent calc(50% - 1px), rgba(255,59,31,0.7) calc(50% - 1px), rgba(255,59,31,0.7) calc(50% + 1px), transparent calc(50% + 1px))',
+                          }}
+                        />
+                      )}
+                      <span className="relative">{s}</span>
+                      {out && (
+                        <span className="relative mt-0.5 px-1 bg-[#f4f2ee] font-jbmono text-[9px] font-bold uppercase tracking-[0.15em] text-[#c62a12]">
+                          Sold out
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -752,9 +818,42 @@ const CopSection = ({ product, loading, priceCents, deliveryFeeCents, onCheckout
                   'Pick a size'
                 )}
               </button>
-              <p className="flex items-center justify-center gap-2 font-jbmono text-[10px] sm:text-xs uppercase tracking-widest text-[#0b0b0b]/50">
-                <Shield className="w-3.5 h-3.5" /> Secure checkout with Yoco
-              </p>
+              {soldOut ? (
+                <div className="border-2 border-[#0b0b0b] p-4 sm:p-5 space-y-3">
+                  <p className="font-anton uppercase text-2xl sm:text-3xl leading-none">Missed it?</p>
+                  <p className="font-archivo text-[#0b0b0b]/70">
+                    Every tee from this drop has been claimed. Follow us to be first in line for the next one.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={WHATSAPP_CHANNEL_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#0b0b0b] text-[#f4f2ee] font-jbmono text-xs font-bold uppercase tracking-widest hover:bg-[#ff3b1f] hover:text-[#0b0b0b] transition-colors"
+                    >
+                      WhatsApp channel <ArrowUpRight className="w-4 h-4" />
+                    </a>
+                    <a
+                      href={INSTAGRAM_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 border-2 border-[#0b0b0b] font-jbmono text-xs font-bold uppercase tracking-widest hover:bg-[#0b0b0b] hover:text-[#f4f2ee] transition-colors"
+                    >
+                      Instagram <ArrowUpRight className="w-4 h-4" />
+                    </a>
+                  </div>
+                  <p className="font-jbmono text-[10px] sm:text-xs uppercase tracking-widest text-[#0b0b0b]/50">
+                    Already ordered?{' '}
+                    <Link to="/track" className="underline underline-offset-4 hover:text-[#0b0b0b]">
+                      Track your order
+                    </Link>
+                  </p>
+                </div>
+              ) : (
+                <p className="flex items-center justify-center gap-2 font-jbmono text-[10px] sm:text-xs uppercase tracking-widest text-[#0b0b0b]/50">
+                  <Shield className="w-3.5 h-3.5" /> Secure checkout with Yoco
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1114,6 +1213,7 @@ export default function Smilano() {
   const priceCents = product ? getEffectiveDisplayPriceCents(product) : FALLBACK_PRICE_CENTS;
   const deliveryFeeCents = product ? product.delivery_fee_cents ?? 0 : FALLBACK_DELIVERY_FEE_CENTS;
   const priceLabel = shortZar(priceCents);
+  const soldOut = isSoldOut(product);
 
   const [playing, setPlaying] = useState(false);
   const [checkout, setCheckout] = useState<{ size: string; fulfilment: FulfilmentMethod } | null>(null);
@@ -1145,16 +1245,18 @@ export default function Smilano() {
         style={{ scaleX: progress }}
       />
       <Grain />
-      <TopBar onQueue={queueTrack} priceLabel={priceLabel} />
+      <TopBar onQueue={queueTrack} priceLabel={priceLabel} soldOut={soldOut} />
 
       <main>
-        <Hero priceLabel={priceLabel} reduce={reduce} />
-        <MarqueeBand reduce={reduce} />
+        <Hero priceLabel={priceLabel} soldOut={soldOut} reduce={reduce} />
+        <MarqueeBand soldOut={soldOut} reduce={reduce} />
         <Definition reduce={reduce} />
         <Lookbook reduce={reduce} />
         <Soundtrack playing={playing} onPlay={() => setPlaying(true)} onStop={() => setPlaying(false)} reduce={reduce} />
         <CopSection
           product={product}
+          soldOut={soldOut}
+          reduce={reduce}
           loading={loading}
           priceCents={priceCents}
           deliveryFeeCents={deliveryFeeCents}
