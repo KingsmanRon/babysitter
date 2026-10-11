@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { sendDispatchEmail, type SendResult } from "../../../lib/confirmationEmail.js";
+import { handleCloseOrders } from "../../../lib/closeOrdersRoute.js";
 import { buildFulfilmentUpdate, type FulfilmentInput } from "../../../lib/fulfilment.js";
 import { log } from "../../../lib/logger.js";
 import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
@@ -25,6 +26,10 @@ function parseOrderId(req: VercelRequest): string | null {
 // PATCH /api/admin/orders/:id — update an order's fulfilment (packed, out for
 // delivery, delivered, ...) plus courier and tracking number.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // POST /api/admin/orders/close lands here too (order ids are UUIDs, so
+  // "close" is never one).
+  if (parseOrderId(req) === "close") return handleCloseOrders(req, res);
+
   if (req.method !== "PATCH") {
     res.setHeader("Allow", "PATCH");
     return res.status(405).json({ error: "Method Not Allowed" });

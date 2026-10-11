@@ -4,19 +4,21 @@ import {
   FINISHED_UNPAID_STATUSES,
   parseCloseRequest,
   type CloseRequest,
-} from "../../../lib/closeOrders.js";
-import { log } from "../../../lib/logger.js";
-import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
+} from "./closeOrders.js";
+import { log } from "./logger.js";
+import { supabaseAdmin } from "./supabaseAdmin.js";
 
 function unauthorized(res: VercelResponse) {
   return res.status(401).json({ error: "Unauthorized" });
 }
 
-// POST /api/admin/orders/close — close or reopen orders.
+// POST /api/admin/orders/close — close or reopen orders. Served by
+// api/admin/orders/[id].ts (id "close") rather than its own file, which
+// would push the project past the Vercel Hobby limit of 12 functions.
 //   { order_ids: [...], closed: true | false }  the given orders
 //   { finished: true, closed: true }            every open order that is done:
 //                                               never paid, or delivered / collected
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export async function handleCloseOrders(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method Not Allowed" });
