@@ -49,15 +49,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const fulfilmentSteps = FULFILMENT_FILTERS[params.get("fulfilment") ?? ""];
     // Only paid orders get fulfilled, so a fulfilment filter implies "paid".
     const statuses = fulfilmentSteps ? ["paid"] : STATUS_FILTERS[params.get("status") ?? ""];
+    // Closed orders (an earlier drop's, say) only show under the Closed filter.
+    const showClosed = params.get("closed") === "1";
 
     let ordersQuery = db
       .from("orders")
       .select(
-        "id, order_number, status, amount_cents, currency, customer_email, customer_name, fulfilment_method, delivery_fee_cents, ship_phone, ship_line1, ship_line2, ship_suburb, ship_city, ship_province, ship_postal_code, metadata, fulfilment_status, courier, tracking_number, dispatched_at, delivered_at, nudge_count, last_nudged_at, superseded_by, cancel_reason, confirmation_email_sent_at, confirmation_email_error, confirmation_email_manual_at, dispatch_email_sent_at, dispatch_email_error, dispatch_email_manual_at, created_at, updated_at",
+        "id, order_number, status, amount_cents, currency, customer_email, customer_name, fulfilment_method, delivery_fee_cents, ship_phone, ship_line1, ship_line2, ship_suburb, ship_city, ship_province, ship_postal_code, metadata, fulfilment_status, courier, tracking_number, dispatched_at, delivered_at, nudge_count, last_nudged_at, superseded_by, cancel_reason, confirmation_email_sent_at, confirmation_email_error, confirmation_email_manual_at, dispatch_email_sent_at, dispatch_email_error, dispatch_email_manual_at, closed_at, created_at, updated_at",
       );
+    ordersQuery = showClosed ? ordersQuery.not("closed_at", "is", null) : ordersQuery.is("closed_at", null);
     if (statuses) ordersQuery = ordersQuery.in("status", statuses);
     if (fulfilmentSteps) ordersQuery = ordersQuery.in("fulfilment_status", fulfilmentSteps);
-    const { data: rawOrders } = await ordersQuery.order("created_at", { ascending: false }).limit(100);
+    const { data: rawOrders, error: ordersErr } = await ordersQuery.order("created_at", { ascending: false }).limit(100);
+    // Fail loudly rather than show an empty list (e.g. a migration not yet applied).
+    if (ordersErr) throw ordersErr;
 
     // For orders waiting on payment, say whether a WhatsApp reminder can go
     // out: the phone must be an SA mobile, and the customer mustn't already
