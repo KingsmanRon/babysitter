@@ -46,6 +46,7 @@ type AdminSummary = {
     dispatch_email_sent_at?: string | null;
     dispatch_email_error?: string | null;
     dispatch_email_manual_at?: string | null;
+    closed_at?: string | null;
     created_at: string;
   }>;
   transactions: Array<{
@@ -87,7 +88,8 @@ type AdminSummary = {
 type AdminProduct = AdminSummary["products"][number];
 
 // Each key is the query string sent to /api/admin/summary; must match
-// STATUS_FILTERS / FULFILMENT_FILTERS there.
+// STATUS_FILTERS / FULFILMENT_FILTERS there. Every filter but Closed shows
+// open orders only.
 const PAYMENT_FILTERS = [
   { key: "", label: "All" },
   { key: "status=paid", label: "Paid" },
@@ -102,6 +104,8 @@ const FULFILMENT_FILTERS = [
   { key: "fulfilment=dispatched", label: "Out for delivery / ready" },
   { key: "fulfilment=done", label: "Delivered / collected" },
 ];
+const CLOSED_FILTER = "closed=1";
+const ARCHIVE_FILTERS = [{ key: CLOSED_FILTER, label: "Closed" }];
 
 // Must match DELIVERY_STEPS / COLLECTION_STEPS in lib/fulfilment.ts.
 const FULFILMENT_LABELS: Record<string, string> = {
@@ -244,6 +248,8 @@ export default function Admin() {
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, TrackingDraft>>({});
   const [savingOrderId, setSavingOrderId] = useState<string | null>(null);
   const [nudgeState, setNudgeState] = useState<Record<string, { busy: boolean; error: string | null }>>({});
+  const [closingOrderId, setClosingOrderId] = useState<string | null>(null);
+  const [closingFinished, setClosingFinished] = useState(false);
   const [emailState, setEmailState] = useState<Record<string, { busy: "send" | "manual" | null; error: string | null }>>({});
 
   const load = async (t: string, filter: string = orderFilter) => {
@@ -390,6 +396,55 @@ export default function Admin() {
       setError((err as Error).message);
     } finally {
       setSavingOrderId(null);
+    }
+  };
+
+  // Closing hides an order from every list but Closed; payment and
+  // fulfilment are left as they are.
+  const setOrderClosed = async (orderId: string, closed: boolean) => {
+    setClosingOrderId(orderId);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/orders/close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ order_ids: [orderId], closed }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setData((prev) => prev && { ...prev, orders: prev.orders.filter((o) => o.id !== orderId) });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setClosingOrderId(null);
+    }
+  };
+
+  // Bulk close: every open order that never got paid, or was delivered /
+  // collected. Orders still waiting on payment or on us stay open.
+  const closeFinishedOrders = async () => {
+    if (
+      !window.confirm(
+        "Close every finished order? That's failed, expired, cancelled and refunded orders, plus paid orders already delivered or collected. Orders still pending payment or still to send stay open. Closed orders stay under the Closed filter and can be reopened.",
+      )
+    ) {
+      return;
+    }
+    setClosingFinished(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/orders/close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ finished: true, closed: true }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      await load(token);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setClosingFinished(false);
     }
   };
 
@@ -684,7 +739,21 @@ export default function Admin() {
             </section>
 
             <section className="space-y-3">
-              <h2 className="text-xl font-bold">Orders ({data.orders.length})</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-xl font-bold">
+                  {orderFilter === CLOSED_FILTER ? "Closed orders" : "Orders"} ({data.orders.length})
+                </h2>
+                {orderFilter !== CLOSED_FILTER && (
+                  <button
+                    type="button"
+                    onClick={closeFinishedOrders}
+                    disabled={closingFinished || loading}
+                    className="min-h-10 md:min-h-0 px-3 py-1.5 rounded-lg border border-gray-700 text-sm font-semibold text-gray-300 hover:border-gray-500 disabled:opacity-50"
+                  >
+                    {closingFinished ? "Closing…" : "Close finished orders"}
+                  </button>
+                )}
+              </div>
               <label className="md:hidden block">
                 <span className="sr-only">Show orders</span>
                 <select
@@ -710,11 +779,19 @@ export default function Admin() {
                       </option>
                     ))}
                   </optgroup>
+                  <optgroup label="Archive">
+                    {ARCHIVE_FILTERS.map((f) => (
+                      <option key={f.key} value={f.key}>
+                        Closed orders
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </label>
               {[
                 { title: "Payment", filters: PAYMENT_FILTERS },
                 { title: "Fulfilment", filters: FULFILMENT_FILTERS },
+                { title: "Archive", filters: ARCHIVE_FILTERS },
               ].map((group) => (
                 <div key={group.title} className="hidden md:flex flex-wrap items-center gap-2">
                   <span className="w-20 text-xs uppercase tracking-wide text-gray-500">{group.title}</span>
@@ -763,6 +840,17 @@ export default function Admin() {
                         <td data-label="Order" className={`${T.td} ${HALF}`}>
                           <div className="font-mono text-purple-400">{o.order_number}</div>
                           <div className="text-xs text-gray-500">{new Date(o.created_at).toLocaleString()}</div>
+                          {o.closed_at && (
+                            <div className="text-xs text-gray-500">Closed {new Date(o.closed_at).toLocaleString()}</div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setOrderClosed(o.id, !o.closed_at)}
+                            disabled={closingOrderId === o.id}
+                            className="mt-1 min-h-10 md:min-h-0 px-2 py-0.5 rounded border border-gray-700 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-200 disabled:opacity-50"
+                          >
+                            {closingOrderId === o.id ? "Saving…" : o.closed_at ? "Reopen" : "Close"}
+                          </button>
                         </td>
                         <td data-label="Status" className={`${T.td} ${HALF} text-right md:text-left`}>
                           <span
