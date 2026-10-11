@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import handler from "../api/admin/orders/close.js";
+import handler from "../api/admin/orders/[id].js";
 import summaryHandler from "../api/admin/summary.js";
 import { parseCloseRequest } from "../lib/closeOrders.js";
 import { setSupabaseAdminForTests } from "../lib/supabaseAdmin.js";
@@ -57,7 +57,7 @@ async function withDb<T>(state: DbState, fn: () => Promise<T>): Promise<T> {
 async function close(state: DbState, body: unknown, token = "admin-secret") {
   const res = fakeRes();
   await withDb(state, () =>
-    handler({ method: "POST", body, headers: { "x-admin-token": token }, query: {} } as never, res as never),
+    handler({ method: "POST", body, headers: { "x-admin-token": token }, query: { id: "close" } } as never, res as never),
   );
   return res;
 }
