@@ -34,6 +34,7 @@ const FALLBACK_SIZES = ['S', 'M', 'L', 'XL'];
 
 const SHIRT_IMAGE = '/media/SSML.jpeg';
 const CREW_IMAGE = '/media/4gents.jpeg';
+const NEXT_SHIRT_IMAGE = '/media/SSML-white.jpeg';
 const YOUTUBE_ID = 'WjZKta5Fm5g';
 const YOUTUBE_URL = `https://www.youtube.com/watch?v=${YOUTUBE_ID}`;
 
@@ -862,6 +863,116 @@ const CopSection = ({ product, soldOut, reduce, loading, priceCents, deliveryFee
   );
 };
 
+// ──────────────────────────────────────────────────────────────
+// 07 — Next drop: the white tee, coming soon
+// ──────────────────────────────────────────────────────────────
+const NextDrop = ({ reduce }: { reduce: boolean }) => (
+  <section id="next-drop" aria-label="Next drop: coming soon" className="relative bg-[#0b0b0b] text-[#f4f2ee] overflow-hidden scroll-mt-16">
+    <div className="-rotate-1 scale-[1.04] bg-[#f4f2ee] py-2.5 sm:py-3 text-[#0b0b0b] font-anton uppercase text-3xl sm:text-5xl tracking-wide">
+      <VelocityMarquee baseVelocity={2} reduce={reduce}>
+        Coming soon ✶ Drop 002 ✶ White ✶ S’milano saved my life ✶ Coming soon ✶ Stay locked ✶{' '}
+      </VelocityMarquee>
+    </div>
+
+    <div className="px-4 sm:px-8 py-24 sm:py-36">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-end justify-between border-b-2 border-[#f4f2ee] pb-4 mb-10 sm:mb-16">
+          <h2 className="font-anton uppercase text-6xl sm:text-8xl lg:text-9xl leading-[0.85]">
+            Next <span className="text-transparent [-webkit-text-stroke:2px_#f4f2ee]">up.</span>
+          </h2>
+          <p className="font-jbmono text-[10px] sm:text-xs uppercase tracking-[0.2em] text-right text-[#f4f2ee]/60">
+            Fig. 04
+            <br />
+            Drop 002
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-80px' }}
+            transition={{ duration: 0.7, ease: [0.2, 0.7, 0.2, 1] }}
+            className="lg:col-span-7 relative"
+          >
+            <div aria-hidden="true" className="absolute inset-[12%] rounded-full bg-[#f4f2ee]/10 blur-[80px] pointer-events-none" />
+            <div className="relative aspect-square overflow-hidden bg-[#0b0b0b]">
+              <img
+                src={NEXT_SHIRT_IMAGE}
+                alt="White S’MILANO SAVED MY LIFE t-shirt with oversized cracked black print"
+                className="absolute inset-0 w-full h-full object-contain"
+                loading="lazy"
+              />
+              <span className="absolute z-10 top-4 left-4 px-3 py-1 bg-[#ff3b1f] text-[#0b0b0b] font-jbmono text-[10px] sm:text-xs font-bold uppercase tracking-widest">
+                Coming soon
+              </span>
+            </div>
+            <motion.div
+              aria-hidden="true"
+              initial={reduce ? false : { opacity: 0, scale: 1.8, rotate: -4 }}
+              whileInView={{ opacity: 1, scale: 1, rotate: 10 }}
+              viewport={{ once: true }}
+              transition={{ type: 'spring', stiffness: 260, damping: 16, delay: 0.3 }}
+              style={{ rotate: 10 }}
+              className="absolute -bottom-6 right-2 sm:-bottom-8 sm:right-6 border-[5px] sm:border-[6px] border-[#ff3b1f] p-1 sm:p-1.5 text-[#ff3b1f] bg-[#0b0b0b]/80 select-none"
+            >
+              <div className="border-2 border-[#ff3b1f] px-4 sm:px-6 pt-2 pb-1.5 text-center">
+                <p className="font-anton uppercase leading-[0.85] text-4xl sm:text-6xl tracking-wide whitespace-nowrap">Soon</p>
+                <p className="mt-1.5 font-jbmono font-bold uppercase text-[9px] sm:text-[11px] tracking-[0.3em] whitespace-nowrap">
+                  Drop 002 ✶ White
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+
+          <div className="lg:col-span-5 space-y-8">
+            <div>
+              <p className="font-jbmono text-xs uppercase tracking-[0.25em] text-[#f4f2ee]/60">BABYSITTER™ × S’milano</p>
+              <h3 className="mt-2 font-anton uppercase text-5xl sm:text-6xl leading-[0.9]">
+                S’milano saved my life
+                <br />
+                <span className="text-[#ff3b1f]">— White.</span>
+              </h3>
+              <p className="mt-4 font-archivo text-lg text-[#f4f2ee]/70 leading-relaxed">
+                Same message, flipped. A white heavyweight tee with the cracked print in black. It isn’t on sale yet — get on
+                the list and you’ll hear the second it drops.
+              </p>
+            </div>
+
+            <ul className="font-jbmono text-xs uppercase tracking-[0.2em] divide-y divide-[#f4f2ee]/15 border-y border-[#f4f2ee]/15">
+              <li className="flex justify-between py-3"><span>Colour</span><span>White / cracked black</span></li>
+              <li className="flex justify-between py-3"><span>Fit</span><span>Oversized</span></li>
+              <li className="flex justify-between py-3"><span>Drop date</span><span className="text-[#ff3b1f]">Coming soon</span></li>
+            </ul>
+
+            <div className="space-y-3">
+              <p className="font-anton uppercase text-2xl sm:text-3xl leading-none">Be first in line.</p>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={WHATSAPP_CHANNEL_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#f4f2ee] text-[#0b0b0b] font-jbmono text-xs font-bold uppercase tracking-widest hover:bg-[#ff3b1f] transition-colors"
+                >
+                  WhatsApp channel <ArrowUpRight className="w-4 h-4" />
+                </a>
+                <a
+                  href={INSTAGRAM_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 border-2 border-[#f4f2ee] font-jbmono text-xs font-bold uppercase tracking-widest hover:bg-[#f4f2ee] hover:text-[#0b0b0b] transition-colors"
+                >
+                  Instagram <ArrowUpRight className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
 interface CheckoutSheetProps {
   product: Product;
   size: string;
@@ -1262,6 +1373,7 @@ export default function Smilano() {
           deliveryFeeCents={deliveryFeeCents}
           onCheckout={(size, fulfilment) => setCheckout({ size, fulfilment })}
         />
+        <NextDrop reduce={reduce} />
       </main>
 
       <SmilanoFooter onOpenPrivacy={() => setShowPrivacy(true)} onOpenTerms={() => setShowTerms(true)} />
