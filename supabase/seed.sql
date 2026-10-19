@@ -54,3 +54,34 @@ on conflict (slug) do update set
   images             = excluded.images,
   sizes              = excluded.sizes,
   is_active          = excluded.is_active;
+
+-- S'MILANO SAVED MY LIFE — White (drop 002): R750 (more exclusive than the
+-- black tee), plus the same R100 delivery fee, sizes S–XL. Starts inactive
+-- with 0 per size so it can't be bought yet; set stock in the admin, then
+-- flip is_active when it drops.
+-- Stock and is_active are only set on first insert, so re-running the seed
+-- never resets sales or takes the drop offline.
+insert into public.products (slug, name, description, price_cents, delivery_fee_cents, currency, image_url, images, sizes, stock_count, size_stock, is_active)
+values (
+  'smilano-tee-white',
+  'S''MILANO SAVED MY LIFE — White',
+  'Heavyweight white tee with an oversized cracked-print S''MILANO SAVED MY LIFE graphic in black. Same message, flipped.',
+  75000,
+  10000,
+  'ZAR',
+  '/media/SSML-white.jpeg',
+  '["/media/SSML-white.jpeg"]'::jsonb,
+  '["S","M","L","XL"]'::jsonb,
+  0,
+  '{"S":0,"M":0,"L":0,"XL":0}'::jsonb,
+  false
+)
+on conflict (slug) do update set
+  name               = excluded.name,
+  description        = excluded.description,
+  price_cents        = excluded.price_cents,
+  delivery_fee_cents = excluded.delivery_fee_cents,
+  currency           = excluded.currency,
+  image_url          = excluded.image_url,
+  images             = excluded.images,
+  sizes              = excluded.sizes;
