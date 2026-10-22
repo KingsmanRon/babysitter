@@ -591,7 +591,7 @@ const Soundtrack = ({ playing, onPlay, onStop, reduce }: SoundtrackProps) => {
 };
 
 // ──────────────────────────────────────────────────────────────
-// 06 — Cop it: size, collect or deliver (+R100), checkout
+// 07 — Cop it: size, collect or deliver (+R100), checkout
 // ──────────────────────────────────────────────────────────────
 interface CopSectionProps {
   product: Product | null;
@@ -646,7 +646,7 @@ const CopSection = ({ product, soldOut, reduce, loading, priceCents, deliveryFee
         <div className="flex items-end justify-between border-b-2 border-[#0b0b0b] pb-4 mb-10 sm:mb-16">
           <h2 className="font-anton uppercase text-6xl sm:text-8xl lg:text-9xl leading-[0.85]">Cop it.</h2>
           <p className="font-jbmono text-[10px] sm:text-xs uppercase tracking-[0.2em] text-right text-[#0b0b0b]/60">
-            Fig. 03
+            Fig. 04
             <br />
             The checkout
           </p>
@@ -864,7 +864,7 @@ const CopSection = ({ product, soldOut, reduce, loading, priceCents, deliveryFee
 };
 
 // ──────────────────────────────────────────────────────────────
-// 07 — Next drop: the white tee, coming soon
+// 06 — Next drop: the white tee, coming soon, shown before the checkout
 // ──────────────────────────────────────────────────────────────
 const NextDrop = ({ reduce }: { reduce: boolean }) => (
   <section id="next-drop" aria-label="Next drop: coming soon" className="relative bg-[#0b0b0b] text-[#f4f2ee] overflow-hidden scroll-mt-16">
@@ -881,7 +881,7 @@ const NextDrop = ({ reduce }: { reduce: boolean }) => (
             Next <span className="text-transparent [-webkit-text-stroke:2px_#f4f2ee]">up.</span>
           </h2>
           <p className="font-jbmono text-[10px] sm:text-xs uppercase tracking-[0.2em] text-right text-[#f4f2ee]/60">
-            Fig. 04
+            Fig. 03
             <br />
             Drop 002
           </p>
@@ -1364,6 +1364,7 @@ export default function Smilano() {
         <Definition reduce={reduce} />
         <Lookbook reduce={reduce} />
         <Soundtrack playing={playing} onPlay={() => setPlaying(true)} onStop={() => setPlaying(false)} reduce={reduce} />
+        <NextDrop reduce={reduce} />
         <CopSection
           product={product}
           soldOut={soldOut}
@@ -1373,7 +1374,6 @@ export default function Smilano() {
           deliveryFeeCents={deliveryFeeCents}
           onCheckout={(size, fulfilment) => setCheckout({ size, fulfilment })}
         />
-        <NextDrop reduce={reduce} />
       </main>
 
       <SmilanoFooter onOpenPrivacy={() => setShowPrivacy(true)} onOpenTerms={() => setShowTerms(true)} />
