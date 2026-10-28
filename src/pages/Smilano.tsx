@@ -162,9 +162,11 @@ const PriceBadge = ({ label, reduce }: { label: string; reduce: boolean }) => (
 );
 
 // ──────────────────────────────────────────────────────────────
-// 01 — Hero: the slogan pulls apart as you scroll, and the black and
-// white tees drift apart with it
+// 01 — Hero: the slogan pulls apart as you scroll. The black and white
+// tees start stacked as one shot, then split into two side by side.
 // ──────────────────────────────────────────────────────────────
+const SPLIT = [0, 0.3];
+
 const Hero = ({ priceLabel, soldOut, reduce }: { priceLabel: string; soldOut: boolean; reduce: boolean }) => {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
@@ -172,14 +174,15 @@ const Hero = ({ priceLabel, soldOut, reduce }: { priceLabel: string; soldOut: bo
   const xRight = useTransform(scrollYProgress, [0, 1], ['-20%', '22%']);
   const posterY = useTransform(scrollYProgress, [0, 1], ['0%', '28%']);
   const posterScale = useTransform(scrollYProgress, [0, 1], [1, 0.82]);
-  const blackX = useTransform(scrollYProgress, [0, 1], ['0%', '-14%']);
-  const blackRotate = useTransform(scrollYProgress, [0, 1], [-6, -12]);
-  const whiteX = useTransform(scrollYProgress, [0, 1], ['0%', '14%']);
-  const whiteRotate = useTransform(scrollYProgress, [0, 1], [5, 11]);
+  const blackX = useTransform(scrollYProgress, SPLIT, ['0%', '-55%']);
+  const blackRotate = useTransform(scrollYProgress, SPLIT, [-4, -3]);
+  const whiteX = useTransform(scrollYProgress, SPLIT, ['12%', '55%']);
+  const whiteY = useTransform(scrollYProgress, SPLIT, ['-7%', '4%']);
+  const whiteRotate = useTransform(scrollYProgress, SPLIT, [8, 4]);
   const fade = useTransform(scrollYProgress, [0, 0.25], [1, 0]);
 
   const poster =
-    'relative w-[42vw] sm:w-[29vw] lg:w-[22vw] max-w-[330px] bg-[#f4f2ee] p-2 sm:p-3 pb-8 sm:pb-10 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.55)]';
+    'w-[42vw] sm:w-[28vw] lg:w-[22vw] max-w-[330px] bg-[#f4f2ee] p-2 sm:p-3 pb-8 sm:pb-10 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.55)]';
   const caption =
     'absolute bottom-2 sm:bottom-3 left-3 right-3 flex justify-between font-jbmono text-[9px] sm:text-[11px] uppercase tracking-widest text-[#0b0b0b]/70';
 
@@ -209,44 +212,21 @@ const Hero = ({ priceLabel, soldOut, reduce }: { priceLabel: string; soldOut: bo
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: 'spring', stiffness: 70, damping: 16, delay: 0.2 }}
             style={reduce ? undefined : { y: posterY, scale: posterScale }}
-            className="relative flex items-center"
+            className="relative"
           >
+            {/* White tee: tucked behind the black one, slides out to the right */}
             <motion.figure
-              style={reduce ? { rotate: -6 } : { x: blackX, rotate: blackRotate }}
-              className={cn(poster, 'z-10 -mr-[5vw] sm:-mr-[3vw]')}
+              style={reduce ? { x: '55%', y: '4%', rotate: 4 } : { x: whiteX, y: whiteY, rotate: whiteRotate }}
+              className={cn(poster, 'absolute inset-0 z-0')}
             >
-              <span aria-hidden="true" className="absolute -top-3 right-5 w-16 h-6 bg-[#f1e7c9]/80 rotate-6 shadow-sm" />
-              <img
-                src={SHIRT_IMAGE}
-                alt="Black S’MILANO SAVED MY LIFE t-shirt with oversized cracked white print"
-                className="w-full aspect-[4/5] object-cover"
-              />
-              {soldOut && (
-                <div className="absolute inset-0 flex items-center justify-center scale-[0.5] sm:scale-75">
-                  <SoldOutStamp reduce={reduce} className="bg-[#f4f2ee]/75" />
-                </div>
-              )}
-              <figcaption className={caption}>
-                <span>Fig. 01 — Black</span>
-                <span className="hidden sm:inline">{soldOut ? 'Sold out' : 'Out now'}</span>
-              </figcaption>
-              <div className="absolute -left-6 -top-14 sm:-left-12 sm:-top-16 pointer-events-auto">
-                <PriceBadge label={soldOut ? 'Sold out' : priceLabel} reduce={reduce} />
-              </div>
-            </motion.figure>
-
-            <motion.figure
-              style={reduce ? { rotate: 5 } : { x: whiteX, rotate: whiteRotate }}
-              className={cn(poster, 'mt-[12vh]')}
-            >
-              <span aria-hidden="true" className="absolute -top-3 right-6 w-14 h-6 bg-[#f1e7c9]/80 rotate-3 shadow-sm" />
+              <span aria-hidden="true" className="absolute -top-3 left-6 w-14 h-6 bg-[#f1e7c9]/80 -rotate-3 shadow-sm" />
               <div className="relative bg-[#0b0b0b]">
                 <img
                   src={NEXT_SHIRT_IMAGE}
                   alt="White S’MILANO SAVED MY LIFE t-shirt with oversized cracked black print, coming soon"
-                  className="w-full aspect-[4/5] object-contain"
+                  className="w-full aspect-square object-cover"
                 />
-                <span className="absolute top-2 left-2 sm:top-3 sm:left-3 px-2 py-0.5 bg-[#ff3b1f] text-[#0b0b0b] font-jbmono text-[9px] sm:text-[11px] font-bold uppercase tracking-widest">
+                <span className="absolute top-2 right-2 sm:top-3 sm:right-3 px-2 py-0.5 bg-[#ff3b1f] text-[#0b0b0b] font-jbmono text-[9px] sm:text-[11px] font-bold uppercase tracking-widest">
                   Coming soon
                 </span>
               </div>
@@ -254,6 +234,33 @@ const Hero = ({ priceLabel, soldOut, reduce }: { priceLabel: string; soldOut: bo
                 <span>Fig. 01b — White</span>
                 <span className="hidden sm:inline">Drop 002</span>
               </figcaption>
+            </motion.figure>
+
+            {/* Black tee: on top, slides out to the left */}
+            <motion.figure
+              style={reduce ? { x: '-55%', rotate: -3 } : { x: blackX, rotate: blackRotate }}
+              className={cn(poster, 'relative z-10')}
+            >
+              <span aria-hidden="true" className="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-6 bg-[#f1e7c9]/80 rotate-2 shadow-sm" />
+              <div className="relative bg-[#ebebeb]">
+                <img
+                  src={SHIRT_IMAGE}
+                  alt="Black S’MILANO SAVED MY LIFE t-shirt with oversized cracked white print"
+                  className="w-full aspect-square object-contain"
+                />
+                {soldOut && (
+                  <div className="absolute inset-0 flex items-end justify-center pb-[6%] scale-[0.42] sm:scale-[0.55] origin-bottom">
+                    <SoldOutStamp reduce={reduce} className="bg-[#f4f2ee]/75" />
+                  </div>
+                )}
+              </div>
+              <figcaption className={caption}>
+                <span>Fig. 01 — Black</span>
+                <span className="hidden sm:inline">{soldOut ? 'Sold out' : 'Out now'}</span>
+              </figcaption>
+              <div className="absolute -left-3 -top-[4.5rem] sm:-left-12 sm:-top-16 pointer-events-auto">
+                <PriceBadge label={soldOut ? 'Sold out' : priceLabel} reduce={reduce} />
+              </div>
             </motion.figure>
           </motion.div>
         </div>
