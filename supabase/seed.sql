@@ -26,7 +26,7 @@ on conflict (slug) do update set
   sizes       = excluded.sizes,
   is_active   = excluded.is_active;
 
--- S'MILANO SAVED MY LIFE tee: R500, plus R100 when the order is delivered.
+-- S'MILANO SAVED MY LIFE tee: R550, plus R200 when the order is delivered.
 -- 200 units, 50 per size. Stock is only set on first insert so re-running the
 -- seed never resets sales.
 insert into public.products (slug, name, description, price_cents, delivery_fee_cents, currency, image_url, images, sizes, stock_count, size_stock, is_active)
@@ -34,8 +34,8 @@ values (
   'smilano-tee',
   'S''MILANO SAVED MY LIFE',
   'Heavyweight black tee with an oversized cracked-print S''MILANO SAVED MY LIFE graphic. Made for the Vaal, worn everywhere.',
-  50000,
-  10000,
+  55000,
+  20000,
   'ZAR',
   '/media/SSML.jpeg',
   '["/media/SSML.jpeg","/media/4gents.jpeg"]'::jsonb,
@@ -55,8 +55,8 @@ on conflict (slug) do update set
   sizes              = excluded.sizes,
   is_active          = excluded.is_active;
 
--- S'MILANO SAVED MY LIFE — White (drop 002): R750 (more exclusive than the
--- black tee), plus the same R100 delivery fee, sizes S–XL. Starts inactive
+-- S'MILANO SAVED MY LIFE — White (drop 002): R600 (more exclusive than the
+-- black tee), plus the same R200 delivery fee, sizes S–XL. Starts inactive
 -- with 0 per size so it can't be bought yet; set stock in the admin, then
 -- flip is_active when it drops.
 -- Stock and is_active are only set on first insert, so re-running the seed
@@ -66,8 +66,8 @@ values (
   'smilano-tee-white',
   'S''MILANO SAVED MY LIFE — White',
   'Heavyweight white tee with an oversized cracked-print S''MILANO SAVED MY LIFE graphic in black. Same message, flipped.',
-  75000,
-  10000,
+  60000,
+  20000,
   'ZAR',
   '/media/SSML-white.jpeg',
   '["/media/SSML-white.jpeg"]'::jsonb,

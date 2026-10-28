@@ -28,14 +28,14 @@ import { PrivacyPolicyModal, TermsOfServiceModal } from '../LegalPages';
 
 const PRODUCT_SLUG = 'smilano-tee';
 // Shown until the product row loads; checkout always uses the server price.
-const FALLBACK_PRICE_CENTS = 50000;
-const FALLBACK_DELIVERY_FEE_CENTS = 10000;
+const FALLBACK_PRICE_CENTS = 55000;
+const FALLBACK_DELIVERY_FEE_CENTS = 20000;
 const FALLBACK_SIZES = ['S', 'M', 'L', 'XL'];
 
 const SHIRT_IMAGE = '/media/SSML.jpeg';
 const CREW_IMAGE = '/media/4gents.jpeg';
 const NEXT_SHIRT_IMAGE = '/media/SSML-white.jpeg';
-const YOUTUBE_ID = 'WjZKta5Fm5g';
+const YOUTUBE_ID = 'mDN_tqYVKPY';
 const YOUTUBE_URL = `https://www.youtube.com/watch?v=${YOUTUBE_ID}`;
 
 const HEADWORD = 'S’milano';
@@ -162,7 +162,8 @@ const PriceBadge = ({ label, reduce }: { label: string; reduce: boolean }) => (
 );
 
 // ──────────────────────────────────────────────────────────────
-// 01 — Hero: the slogan pulls apart as you scroll
+// 01 — Hero: the slogan pulls apart as you scroll, and the black and
+// white tees drift apart with it
 // ──────────────────────────────────────────────────────────────
 const Hero = ({ priceLabel, soldOut, reduce }: { priceLabel: string; soldOut: boolean; reduce: boolean }) => {
   const ref = useRef<HTMLElement>(null);
@@ -170,9 +171,17 @@ const Hero = ({ priceLabel, soldOut, reduce }: { priceLabel: string; soldOut: bo
   const xLeft = useTransform(scrollYProgress, [0, 1], ['0%', '-38%']);
   const xRight = useTransform(scrollYProgress, [0, 1], ['-20%', '22%']);
   const posterY = useTransform(scrollYProgress, [0, 1], ['0%', '28%']);
-  const posterRotate = useTransform(scrollYProgress, [0, 1], [-5, 7]);
   const posterScale = useTransform(scrollYProgress, [0, 1], [1, 0.82]);
+  const blackX = useTransform(scrollYProgress, [0, 1], ['0%', '-14%']);
+  const blackRotate = useTransform(scrollYProgress, [0, 1], [-6, -12]);
+  const whiteX = useTransform(scrollYProgress, [0, 1], ['0%', '14%']);
+  const whiteRotate = useTransform(scrollYProgress, [0, 1], [5, 11]);
   const fade = useTransform(scrollYProgress, [0, 0.25], [1, 0]);
+
+  const poster =
+    'relative w-[42vw] sm:w-[29vw] lg:w-[22vw] max-w-[330px] bg-[#f4f2ee] p-2 sm:p-3 pb-8 sm:pb-10 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.55)]';
+  const caption =
+    'absolute bottom-2 sm:bottom-3 left-3 right-3 flex justify-between font-jbmono text-[9px] sm:text-[11px] uppercase tracking-widest text-[#0b0b0b]/70';
 
   const line = 'font-anton uppercase whitespace-nowrap text-[min(26vw,30vh)]/[0.86] select-none';
 
@@ -195,33 +204,58 @@ const Hero = ({ priceLabel, soldOut, reduce }: { priceLabel: string; soldOut: bo
         </div>
 
         <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-          <motion.figure
-            initial={reduce ? false : { opacity: 0, y: 80, rotate: -12 }}
-            animate={{ opacity: 1, y: 0, rotate: 0 }}
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 80 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ type: 'spring', stiffness: 70, damping: 16, delay: 0.2 }}
-            className="relative"
+            style={reduce ? undefined : { y: posterY, scale: posterScale }}
+            className="relative flex items-center"
           >
-            <motion.div
-              style={reduce ? undefined : { y: posterY, rotate: posterRotate, scale: posterScale }}
-              className="relative w-[64vw] sm:w-[40vw] lg:w-[30vw] max-w-[440px] bg-[#f4f2ee] p-3 sm:p-4 pb-10 sm:pb-12 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.55)]"
+            <motion.figure
+              style={reduce ? { rotate: -6 } : { x: blackX, rotate: blackRotate }}
+              className={cn(poster, 'z-10 -mr-[5vw] sm:-mr-[3vw]')}
             >
-              <span aria-hidden="true" className="absolute -top-3 left-6 w-20 h-6 bg-[#f1e7c9]/80 -rotate-6 shadow-sm" />
-              <span aria-hidden="true" className="absolute -top-3 right-8 w-16 h-6 bg-[#f1e7c9]/80 rotate-3 shadow-sm" />
-              <img src={SHIRT_IMAGE} alt="Black S’MILANO SAVED MY LIFE t-shirt with oversized cracked white print" className="w-full h-auto" />
+              <span aria-hidden="true" className="absolute -top-3 right-5 w-16 h-6 bg-[#f1e7c9]/80 rotate-6 shadow-sm" />
+              <img
+                src={SHIRT_IMAGE}
+                alt="Black S’MILANO SAVED MY LIFE t-shirt with oversized cracked white print"
+                className="w-full aspect-[4/5] object-cover"
+              />
               {soldOut && (
-                <div className="absolute inset-0 flex items-center justify-center scale-[0.7] sm:scale-90">
+                <div className="absolute inset-0 flex items-center justify-center scale-[0.5] sm:scale-75">
                   <SoldOutStamp reduce={reduce} className="bg-[#f4f2ee]/75" />
                 </div>
               )}
-              <figcaption className="absolute bottom-3 sm:bottom-4 left-4 right-4 flex justify-between font-jbmono text-[10px] sm:text-xs uppercase tracking-widest text-[#0b0b0b]/70">
-                <span>Fig. 01 — The tee</span>
-                <span className="hidden sm:inline">Black / White</span>
+              <figcaption className={caption}>
+                <span>Fig. 01 — Black</span>
+                <span className="hidden sm:inline">{soldOut ? 'Sold out' : 'Out now'}</span>
               </figcaption>
-            </motion.div>
-            <div className="absolute -right-10 -bottom-10 sm:-right-16 sm:-bottom-12 pointer-events-auto">
-              <PriceBadge label={soldOut ? 'Sold out' : priceLabel} reduce={reduce} />
-            </div>
-          </motion.figure>
+              <div className="absolute -left-6 -top-14 sm:-left-12 sm:-top-16 pointer-events-auto">
+                <PriceBadge label={soldOut ? 'Sold out' : priceLabel} reduce={reduce} />
+              </div>
+            </motion.figure>
+
+            <motion.figure
+              style={reduce ? { rotate: 5 } : { x: whiteX, rotate: whiteRotate }}
+              className={cn(poster, 'mt-[12vh]')}
+            >
+              <span aria-hidden="true" className="absolute -top-3 right-6 w-14 h-6 bg-[#f1e7c9]/80 rotate-3 shadow-sm" />
+              <div className="relative bg-[#0b0b0b]">
+                <img
+                  src={NEXT_SHIRT_IMAGE}
+                  alt="White S’MILANO SAVED MY LIFE t-shirt with oversized cracked black print, coming soon"
+                  className="w-full aspect-[4/5] object-contain"
+                />
+                <span className="absolute top-2 left-2 sm:top-3 sm:left-3 px-2 py-0.5 bg-[#ff3b1f] text-[#0b0b0b] font-jbmono text-[9px] sm:text-[11px] font-bold uppercase tracking-widest">
+                  Coming soon
+                </span>
+              </div>
+              <figcaption className={caption}>
+                <span>Fig. 01b — White</span>
+                <span className="hidden sm:inline">Drop 002</span>
+              </figcaption>
+            </motion.figure>
+          </motion.div>
         </div>
 
         <motion.div
@@ -591,7 +625,7 @@ const Soundtrack = ({ playing, onPlay, onStop, reduce }: SoundtrackProps) => {
 };
 
 // ──────────────────────────────────────────────────────────────
-// 07 — Cop it: size, collect or deliver (+R100), checkout
+// 07 — Cop it: size, collect or deliver (+R200), checkout
 // ──────────────────────────────────────────────────────────────
 interface CopSectionProps {
   product: Product | null;
