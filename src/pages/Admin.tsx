@@ -75,6 +75,7 @@ type AdminSummary = {
     // units held by unpaid checkouts. Available + sold + held = total.
     stock_usage?: Record<string, { sold: number; held: number }>;
     price_cents: number;
+    delivery_fee_cents: number;
     currency: string;
     is_active: boolean;
     compare_at_price_cents: number | null;
@@ -226,6 +227,9 @@ export default function Admin() {
   const [stockDrafts, setStockDrafts] = useState<Record<string, Record<string, string>>>({});
   const [savingStockId, setSavingStockId] = useState<string | null>(null);
   const [savingActiveId, setSavingActiveId] = useState<string | null>(null);
+  // Delivery fee inputs in cents, keyed by product id.
+  const [feeDrafts, setFeeDrafts] = useState<Record<string, string>>({});
+  const [savingFeeId, setSavingFeeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderFilter, setOrderFilter] = useState("");
@@ -270,6 +274,7 @@ export default function Admin() {
       setData(json);
       setSaleDrafts(Object.fromEntries(json.products.map((p) => [p.id, saleDraftFromProduct(p)])));
       setStockDrafts(Object.fromEntries(json.products.map((p) => [p.id, stockDraftFromProduct(p)])));
+      setFeeDrafts(Object.fromEntries(json.products.map((p) => [p.id, String(p.delivery_fee_cents ?? 0)])));
       sessionStorage.setItem("admin_token", t);
     } catch (err) {
       setError((err as Error).message);
@@ -369,6 +374,31 @@ export default function Admin() {
       setError((err as Error).message);
     } finally {
       setSavingStockId(null);
+    }
+  };
+
+  // Orders copy the fee when they're placed, so a new fee only applies to
+  // orders placed after saving.
+  const saveDeliveryFee = async (product: AdminProduct) => {
+    setSavingFeeId(product.id);
+    setError(null);
+    try {
+      const raw = (feeDrafts[product.id] ?? String(product.delivery_fee_cents ?? 0)).trim();
+      if (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw))) {
+        throw new Error("Delivery fee must be a whole number of cents (0 for free delivery)");
+      }
+      const res = await fetch(`/api/admin/products/${encodeURIComponent(product.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ delivery_fee_cents: Number(raw) }),
+      });
+      const responseBody = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(responseBody.error || `HTTP ${res.status}`);
+      await load(token);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSavingFeeId(null);
     }
   };
 
@@ -643,6 +673,7 @@ export default function Admin() {
                     <tr>
                       <th className={T.th}>Product</th>
                       <th className={`${T.th} md:text-right`}>Price</th>
+                      <th className={T.th}>Delivery fee</th>
                       <th className={T.th}>Available to sell</th>
                       <th className={T.th}>Active</th>
                       <th className={`${T.th} w-[45%]`}>Sale</th>
@@ -665,6 +696,43 @@ export default function Admin() {
                           </td>
                           <td data-label="Price" className={`${T.td} max-md:col-span-1 md:text-right`}>
                             {formatZarFromCents(p.price_cents)}
+                          </td>
+                          <td data-label="Delivery fee (cents)" className={T.td}>
+                            {(() => {
+                              const raw = feeDrafts[p.id] ?? String(p.delivery_fee_cents ?? 0);
+                              const valid = /^\d+$/.test(raw.trim()) && Number.isSafeInteger(Number(raw));
+                              const changed = raw.trim() !== String(p.delivery_fee_cents ?? 0);
+                              return (
+                                <div className="space-y-1.5 md:min-w-[8.5rem]">
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min="0"
+                                    step="1"
+                                    value={raw}
+                                    onChange={(e) => setFeeDrafts((drafts) => ({ ...drafts, [p.id]: e.target.value }))}
+                                    className={INPUT}
+                                    placeholder="cents"
+                                    aria-label={`Delivery fee in cents for ${p.name}`}
+                                  />
+                                  <div className={`text-xs ${valid ? "text-gray-400" : "text-red-400"}`}>
+                                    {!valid
+                                      ? "Whole cents only"
+                                      : Number(raw) === 0
+                                        ? "Free delivery"
+                                        : `= ${formatZarFromCents(Number(raw))}`}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => saveDeliveryFee(p)}
+                                    disabled={!changed || !valid || savingFeeId === p.id}
+                                    className="w-full min-h-10 md:min-h-0 px-3 py-1 bg-purple-600 rounded font-semibold disabled:opacity-50"
+                                  >
+                                    {savingFeeId === p.id ? "Saving..." : "Save fee"}
+                                  </button>
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td data-label="Available to sell" className={T.td}>
                             <StockEditor

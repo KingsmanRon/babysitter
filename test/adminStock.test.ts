@@ -168,6 +168,59 @@ test("PATCH is_active must be a boolean and can't be mixed with other fields", a
   }
 });
 
+test("PATCH delivery_fee_cents sets the fee, and 0 means free delivery", async () => {
+  const state = stateWith({ id: "tee", ...tee(), delivery_fee_cents: 20000, updated_at: "x" });
+  const row = () => (state as unknown as { products: Row[] }).products[0];
+
+  const raised = await patch(state, { delivery_fee_cents: 25000 });
+  assert.equal(raised.statusCode, 200);
+  assert.equal(row().delivery_fee_cents, 25000);
+  assert.equal((raised.body!.product as Row).delivery_fee_cents, 25000);
+
+  const free = await patch(state, { delivery_fee_cents: 0 });
+  assert.equal(free.statusCode, 200);
+  assert.equal(row().delivery_fee_cents, 0);
+});
+
+test("PATCH delivery_fee_cents rejects bad values and can't be mixed with other fields", async () => {
+  for (const body of [
+    { delivery_fee_cents: -1 },
+    { delivery_fee_cents: 150.5 },
+    { delivery_fee_cents: "200" },
+    { delivery_fee_cents: null },
+    { delivery_fee_cents: 1_000_001 },
+    { delivery_fee_cents: 100, sale_price_cents: 100 },
+    { delivery_fee_cents: 100, is_active: true },
+    { delivery_fee_cents: 100, stock: { size_stock: { M: 5 }, expected_size_stock: { M: 1 } } },
+  ]) {
+    const state = stateWith({ id: "tee", ...tee(), delivery_fee_cents: 20000, is_active: false, updated_at: "x" });
+    const res = await patch(state, body);
+    assert.equal(res.statusCode, 400, JSON.stringify(body));
+    const row = (state as unknown as { products: Row[] }).products[0];
+    assert.equal(row.delivery_fee_cents, 20000, JSON.stringify(body));
+    assert.equal(row.is_active, false, JSON.stringify(body));
+  }
+});
+
+test("admin summary reports each product's delivery fee", async () => {
+  const state = stateWith({ id: "tee", slug: "smilano-tee", ...tee(), delivery_fee_cents: 20000, created_at: "2026-01-01T00:00:00Z" });
+  process.env.ADMIN_TOKEN = "admin-secret";
+  setSupabaseAdminForTests(createFakeSupabase(state) as never);
+  const res = fakeRes();
+  try {
+    await summaryHandler(
+      { method: "GET", url: "/api/admin/summary", headers: { "x-admin-token": "admin-secret" }, query: {} } as never,
+      res as never,
+    );
+  } finally {
+    setSupabaseAdminForTests(null);
+    delete process.env.ADMIN_TOKEN;
+  }
+  assert.equal(res.statusCode, 200);
+  const [product] = res.body!.products as Array<{ delivery_fee_cents?: number }>;
+  assert.equal(product.delivery_fee_cents, 20000);
+});
+
 test("admin summary reports sold and held units per product and size", async () => {
   const state = stateWith(
     { id: "tee", slug: "smilano-tee", ...tee(), created_at: "2026-01-01T00:00:00Z" },

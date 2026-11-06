@@ -4,7 +4,11 @@ import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
 import { planStockUpdate, StockConflictError, validateStockEdit, type StockEdit } from "../../../lib/adminStock.js";
 
 const PRODUCT_COLUMNS =
-  "id, slug, name, stock_count, size_stock, price_cents, currency, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at";
+  "id, slug, name, stock_count, size_stock, price_cents, delivery_fee_cents, currency, is_active, compare_at_price_cents, sale_price_cents, discount_percent_bps, sale_starts_at, sale_ends_at";
+
+// A guard against a slipped decimal (R10,000 is far above any real fee). The
+// column itself only requires >= 0, and 0 means free delivery.
+const MAX_DELIVERY_FEE_CENTS = 1_000_000;
 
 const SALE_FIELDS = [
   "compare_at_price_cents",
@@ -98,9 +102,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = parseProductId(req);
   if (!id) return res.status(400).json({ error: "Product id is required" });
 
-  // { is_active } and { stock: {...} } each go on their own; anything else is
-  // a sale update.
+  // { is_active }, { delivery_fee_cents } and { stock: {...} } each go on their
+  // own; anything else is a sale update.
   const body = req.body as Record<string, unknown> | null;
+  if (body && typeof body === "object" && "delivery_fee_cents" in body) {
+    if (Object.keys(body).length !== 1) {
+      return res.status(400).json({ error: "Send delivery_fee_cents on its own, without other fields" });
+    }
+    const fee = body.delivery_fee_cents;
+    if (!isNonNegativeInteger(fee) || fee > MAX_DELIVERY_FEE_CENTS) {
+      return res
+        .status(400)
+        .json({ error: `delivery_fee_cents must be a whole number of cents from 0 to ${MAX_DELIVERY_FEE_CENTS}` });
+    }
+    return updateDeliveryFee(res, id, fee);
+  }
   if (body && typeof body === "object" && "is_active" in body) {
     if (Object.keys(body).length !== 1) {
       return res.status(400).json({ error: "Send is_active on its own, without other fields" });
@@ -147,6 +163,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ product: data });
   } catch (err) {
     log.error("api.admin.products.update.error", { err: (err as Error).message, productId: id });
+    return res.status(500).json({ error: "Failed to update product" });
+  }
+}
+
+// Orders copy the fee when they're created, so a change only affects orders
+// placed afterwards; open checkouts keep the fee they were quoted.
+async function updateDeliveryFee(res: VercelResponse, id: string, feeCents: number) {
+  try {
+    const db = supabaseAdmin();
+    const { data, error } = await db
+      .from("products")
+      .update({ delivery_fee_cents: feeCents })
+      .eq("id", id)
+      .select(PRODUCT_COLUMNS)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return res.status(404).json({ error: "Product not found" });
+    log.info("api.admin.products.delivery_fee_updated", { productId: id, delivery_fee_cents: feeCents });
+    return res.status(200).json({ product: data });
+  } catch (err) {
+    log.error("api.admin.products.delivery_fee_update.error", { err: (err as Error).message, productId: id });
     return res.status(500).json({ error: "Failed to update product" });
   }
 }
