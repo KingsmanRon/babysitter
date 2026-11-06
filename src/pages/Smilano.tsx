@@ -32,7 +32,7 @@ const PRODUCT_SLUG = 'smilano-tee';
 const WHITE_PRODUCT_SLUG = 'smilano-tee-white';
 // Shown until the product row loads; checkout always uses the server price.
 const FALLBACK_PRICE_CENTS = 55000;
-const FALLBACK_DELIVERY_FEE_CENTS = 20000;
+const FALLBACK_DELIVERY_FEE_CENTS = 15000;
 const FALLBACK_SIZES = ['S', 'M', 'L', 'XL'];
 
 const SHIRT_IMAGE = '/media/SSML.jpeg';
@@ -645,7 +645,7 @@ const Soundtrack = ({ playing, onPlay, onStop, reduce }: SoundtrackProps) => {
 };
 
 // ──────────────────────────────────────────────────────────────
-// 07 — Cop it: size, collect or deliver (+R200), checkout
+// 07 — Cop it: size, collect or deliver (+R150), checkout
 // ──────────────────────────────────────────────────────────────
 interface CopSectionProps {
   // Anchor id, heading and copy so the same checkout block serves each drop.
