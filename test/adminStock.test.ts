@@ -141,6 +141,33 @@ test("PATCH stock can't be mixed with sale fields", async () => {
   assert.equal(res.statusCode, 400);
 });
 
+test("PATCH is_active launches and retires a product on its own", async () => {
+  const state = stateWith({ id: "tee", ...tee(), is_active: false, updated_at: "x" });
+  const on = await patch(state, { is_active: true });
+  assert.equal(on.statusCode, 200);
+  assert.equal((state as unknown as { products: Row[] }).products[0].is_active, true);
+  assert.equal((on.body!.product as Row).is_active, true);
+
+  const off = await patch(state, { is_active: false });
+  assert.equal(off.statusCode, 200);
+  assert.equal((state as unknown as { products: Row[] }).products[0].is_active, false);
+});
+
+test("PATCH is_active must be a boolean and can't be mixed with other fields", async () => {
+  for (const body of [
+    { is_active: "yes" },
+    { is_active: null },
+    { is_active: 1 },
+    { is_active: true, sale_price_cents: 100 },
+    { is_active: true, stock: { size_stock: { M: 5 }, expected_size_stock: { M: 1 } } },
+  ]) {
+    const state = stateWith({ id: "tee", ...tee(), is_active: false, updated_at: "x" });
+    const res = await patch(state, body);
+    assert.equal(res.statusCode, 400, JSON.stringify(body));
+    assert.equal((state as unknown as { products: Row[] }).products[0].is_active, false, JSON.stringify(body));
+  }
+});
+
 test("admin summary reports sold and held units per product and size", async () => {
   const state = stateWith(
     { id: "tee", slug: "smilano-tee", ...tee(), created_at: "2026-01-01T00:00:00Z" },

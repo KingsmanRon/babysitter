@@ -27,6 +27,9 @@ import {
 import { PrivacyPolicyModal, TermsOfServiceModal } from '../LegalPages';
 
 const PRODUCT_SLUG = 'smilano-tee';
+// Drop 002. /api/products only returns active products, so the white tee
+// shows as "Coming soon" until it's activated in the admin.
+const WHITE_PRODUCT_SLUG = 'smilano-tee-white';
 // Shown until the product row loads; checkout always uses the server price.
 const FALLBACK_PRICE_CENTS = 55000;
 const FALLBACK_DELIVERY_FEE_CENTS = 20000;
@@ -167,7 +170,17 @@ const PriceBadge = ({ label, reduce }: { label: string; reduce: boolean }) => (
 // ──────────────────────────────────────────────────────────────
 const SPLIT = [0, 0.3];
 
-const Hero = ({ priceLabel, soldOut, reduce }: { priceLabel: string; soldOut: boolean; reduce: boolean }) => {
+const Hero = ({
+  priceLabel,
+  soldOut,
+  whiteBadge,
+  reduce,
+}: {
+  priceLabel: string;
+  soldOut: boolean;
+  whiteBadge: string;
+  reduce: boolean;
+}) => {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
   const xLeft = useTransform(scrollYProgress, [0, 1], ['0%', '-38%']);
@@ -223,11 +236,11 @@ const Hero = ({ priceLabel, soldOut, reduce }: { priceLabel: string; soldOut: bo
               <div className="relative bg-[#0b0b0b]">
                 <img
                   src={NEXT_SHIRT_IMAGE}
-                  alt="White S’MILANO SAVED MY LIFE t-shirt with oversized cracked black print, coming soon"
+                  alt={`White S’MILANO SAVED MY LIFE t-shirt with oversized cracked black print, ${whiteBadge.toLowerCase()}`}
                   className="w-full aspect-square object-cover"
                 />
                 <span className="absolute top-2 right-2 sm:top-3 sm:right-3 px-2 py-0.5 bg-[#ff3b1f] text-[#0b0b0b] font-jbmono text-[9px] sm:text-[11px] font-bold uppercase tracking-widest">
-                  Coming soon
+                  {whiteBadge}
                 </span>
               </div>
               <figcaption className={caption}>
@@ -635,6 +648,12 @@ const Soundtrack = ({ playing, onPlay, onStop, reduce }: SoundtrackProps) => {
 // 07 — Cop it: size, collect or deliver (+R200), checkout
 // ──────────────────────────────────────────────────────────────
 interface CopSectionProps {
+  // Anchor id, heading and copy so the same checkout block serves each drop.
+  id?: string;
+  title?: string;
+  fig?: string;
+  altLabel?: string;
+  className?: string;
   product: Product | null;
   soldOut: boolean;
   reduce: boolean;
@@ -644,7 +663,20 @@ interface CopSectionProps {
   onCheckout: (size: string, fulfilment: FulfilmentMethod) => void;
 }
 
-const CopSection = ({ product, soldOut, reduce, loading, priceCents, deliveryFeeCents, onCheckout }: CopSectionProps) => {
+const CopSection = ({
+  id = 'cop',
+  title = 'Cop it.',
+  fig = 'Fig. 04',
+  altLabel = 'S’MILANO SAVED MY LIFE tee',
+  className,
+  product,
+  soldOut,
+  reduce,
+  loading,
+  priceCents,
+  deliveryFeeCents,
+  onCheckout,
+}: CopSectionProps) => {
   const [size, setSize] = useState<string | null>(null);
   const [fulfilment, setFulfilment] = useState<FulfilmentMethod>('delivery');
   const [activeImage, setActiveImage] = useState(0);
@@ -682,12 +714,12 @@ const CopSection = ({ product, soldOut, reduce, loading, priceCents, deliveryFee
   ];
 
   return (
-    <section id="cop" className="relative bg-[#f4f2ee] text-[#0b0b0b] px-4 sm:px-8 py-24 sm:py-36 scroll-mt-16">
+    <section id={id} className={cn('relative bg-[#f4f2ee] text-[#0b0b0b] px-4 sm:px-8 py-24 sm:py-36 scroll-mt-16', className)}>
       <div className="max-w-7xl mx-auto">
         <div className="flex items-end justify-between border-b-2 border-[#0b0b0b] pb-4 mb-10 sm:mb-16">
-          <h2 className="font-anton uppercase text-6xl sm:text-8xl lg:text-9xl leading-[0.85]">Cop it.</h2>
+          <h2 className="font-anton uppercase text-6xl sm:text-8xl lg:text-9xl leading-[0.85]">{title}</h2>
           <p className="font-jbmono text-[10px] sm:text-xs uppercase tracking-[0.2em] text-right text-[#0b0b0b]/60">
-            Fig. 04
+            {fig}
             <br />
             The checkout
           </p>
@@ -700,7 +732,7 @@ const CopSection = ({ product, soldOut, reduce, loading, priceCents, deliveryFee
                 <motion.img
                   key={images[activeImage]}
                   src={images[activeImage]}
-                  alt={activeImage === 0 ? 'S’MILANO SAVED MY LIFE tee, front' : 'S’MILANO SAVED MY LIFE tee, worn'}
+                  alt={activeImage === 0 ? `${altLabel}, front` : `${altLabel}, worn`}
                   initial={{ opacity: 0, scale: 1.04 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
@@ -1367,8 +1399,13 @@ export default function Smilano() {
   const priceLabel = shortZar(priceCents);
   const soldOut = isSoldOut(product);
 
+  // Drop 002 goes live the moment the white tee is activated in the admin.
+  const whiteProduct = products.find((p) => p.slug === WHITE_PRODUCT_SLUG) ?? null;
+  const whiteSoldOut = isSoldOut(whiteProduct);
+  const whiteBadge = !whiteProduct ? 'Coming soon' : whiteSoldOut ? 'Sold out' : 'Out now';
+
   const [playing, setPlaying] = useState(false);
-  const [checkout, setCheckout] = useState<{ size: string; fulfilment: FulfilmentMethod } | null>(null);
+  const [checkout, setCheckout] = useState<{ slug: string; size: string; fulfilment: FulfilmentMethod } | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
 
@@ -1390,6 +1427,8 @@ export default function Smilano() {
 
   const closeCheckout = useCallback(() => setCheckout(null), []);
 
+  const checkoutProduct = checkout ? products.find((p) => p.slug === checkout.slug) ?? null : null;
+
   return (
     <div className="min-h-screen bg-[#0b0b0b] font-archivo antialiased selection:bg-[#ff3b1f] selection:text-[#0b0b0b]">
       <motion.div
@@ -1400,12 +1439,29 @@ export default function Smilano() {
       <TopBar onQueue={queueTrack} priceLabel={priceLabel} soldOut={soldOut} />
 
       <main>
-        <Hero priceLabel={priceLabel} soldOut={soldOut} reduce={reduce} />
+        <Hero priceLabel={priceLabel} soldOut={soldOut} whiteBadge={whiteBadge} reduce={reduce} />
         <MarqueeBand soldOut={soldOut} reduce={reduce} />
         <Definition reduce={reduce} />
         <Lookbook reduce={reduce} />
         <Soundtrack playing={playing} onPlay={() => setPlaying(true)} onStop={() => setPlaying(false)} reduce={reduce} />
-        <NextDrop reduce={reduce} />
+        {whiteProduct ? (
+          <CopSection
+            id="cop-white"
+            title="Drop 002."
+            fig="Fig. 03"
+            altLabel="White S’MILANO SAVED MY LIFE tee"
+            className="border-b-2 border-[#0b0b0b]/15"
+            product={whiteProduct}
+            soldOut={whiteSoldOut}
+            reduce={reduce}
+            loading={loading}
+            priceCents={getEffectiveDisplayPriceCents(whiteProduct)}
+            deliveryFeeCents={whiteProduct.delivery_fee_cents ?? 0}
+            onCheckout={(size, fulfilment) => setCheckout({ slug: whiteProduct.slug, size, fulfilment })}
+          />
+        ) : (
+          <NextDrop reduce={reduce} />
+        )}
         <CopSection
           product={product}
           soldOut={soldOut}
@@ -1413,21 +1469,21 @@ export default function Smilano() {
           loading={loading}
           priceCents={priceCents}
           deliveryFeeCents={deliveryFeeCents}
-          onCheckout={(size, fulfilment) => setCheckout({ size, fulfilment })}
+          onCheckout={(size, fulfilment) => setCheckout({ slug: PRODUCT_SLUG, size, fulfilment })}
         />
       </main>
 
       <SmilanoFooter onOpenPrivacy={() => setShowPrivacy(true)} onOpenTerms={() => setShowTerms(true)} />
 
       <AnimatePresence>
-        {checkout && product && (
+        {checkout && checkoutProduct && (
           <CheckoutSheet
-            product={product}
+            product={checkoutProduct}
             size={checkout.size}
             fulfilment={checkout.fulfilment}
             onChangeFulfilment={(fulfilment) => setCheckout((c) => (c ? { ...c, fulfilment } : c))}
-            priceCents={priceCents}
-            deliveryFeeCents={deliveryFeeCents}
+            priceCents={getEffectiveDisplayPriceCents(checkoutProduct)}
+            deliveryFeeCents={checkoutProduct.delivery_fee_cents ?? 0}
             onClose={closeCheckout}
             onOpenTerms={() => setShowTerms(true)}
             onOpenPrivacy={() => setShowPrivacy(true)}

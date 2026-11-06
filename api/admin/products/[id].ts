@@ -98,8 +98,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = parseProductId(req);
   if (!id) return res.status(400).json({ error: "Product id is required" });
 
-  // { stock: {...} } edits stock on its own; anything else is a sale update.
+  // { is_active } and { stock: {...} } each go on their own; anything else is
+  // a sale update.
   const body = req.body as Record<string, unknown> | null;
+  if (body && typeof body === "object" && "is_active" in body) {
+    if (Object.keys(body).length !== 1) {
+      return res.status(400).json({ error: "Send is_active on its own, without other fields" });
+    }
+    if (typeof body.is_active !== "boolean") {
+      return res.status(400).json({ error: "is_active must be true or false" });
+    }
+    return updateActive(res, id, body.is_active);
+  }
   if (body && typeof body === "object" && "stock" in body) {
     if (Object.keys(body).length !== 1) {
       return res.status(400).json({ error: "Send stock on its own, without sale fields" });
@@ -137,6 +147,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ product: data });
   } catch (err) {
     log.error("api.admin.products.update.error", { err: (err as Error).message, productId: id });
+    return res.status(500).json({ error: "Failed to update product" });
+  }
+}
+
+// Launching a product: /api/products, the public RLS policy and order creation
+// all treat is_active = false as "not for sale", so this is the on/off switch.
+async function updateActive(res: VercelResponse, id: string, isActive: boolean) {
+  try {
+    const db = supabaseAdmin();
+    const { data, error } = await db
+      .from("products")
+      .update({ is_active: isActive })
+      .eq("id", id)
+      .select(PRODUCT_COLUMNS)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return res.status(404).json({ error: "Product not found" });
+    log.info("api.admin.products.active_updated", { productId: id, is_active: isActive });
+    return res.status(200).json({ product: data });
+  } catch (err) {
+    log.error("api.admin.products.active_update.error", { err: (err as Error).message, productId: id });
     return res.status(500).json({ error: "Failed to update product" });
   }
 }

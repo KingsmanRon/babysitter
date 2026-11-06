@@ -225,6 +225,7 @@ export default function Admin() {
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [stockDrafts, setStockDrafts] = useState<Record<string, Record<string, string>>>({});
   const [savingStockId, setSavingStockId] = useState<string | null>(null);
+  const [savingActiveId, setSavingActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderFilter, setOrderFilter] = useState("");
@@ -368,6 +369,27 @@ export default function Admin() {
       setError((err as Error).message);
     } finally {
       setSavingStockId(null);
+    }
+  };
+
+  // Active = visible on the site and buyable. A product stocked in advance
+  // stays "Coming soon" until this is switched on.
+  const setActive = async (product: AdminProduct, isActive: boolean) => {
+    setSavingActiveId(product.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/products/${encodeURIComponent(product.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ is_active: isActive }),
+      });
+      const responseBody = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(responseBody.error || `HTTP ${res.status}`);
+      await load(token);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSavingActiveId(null);
     }
   };
 
@@ -659,7 +681,26 @@ export default function Admin() {
                             />
                           </td>
                           <td data-label="Active" className={T.td}>
-                            {p.is_active ? "yes" : "no"}
+                            <div className="space-y-2">
+                              <div>{p.is_active ? "yes" : "no"}</div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (
+                                    p.is_active &&
+                                    !window.confirm(`Take "${p.name}" off the site? Customers won't be able to buy it.`)
+                                  )
+                                    return;
+                                  setActive(p, !p.is_active);
+                                }}
+                                disabled={savingActiveId === p.id}
+                                className={`min-h-10 md:min-h-0 px-3 py-1 rounded font-semibold text-sm disabled:opacity-50 ${
+                                  p.is_active ? "border border-gray-600 text-gray-300" : "bg-green-600 text-white"
+                                }`}
+                              >
+                                {savingActiveId === p.id ? "Saving..." : p.is_active ? "Deactivate" : "Activate"}
+                              </button>
+                            </div>
                           </td>
                           <td data-label="Sale" className={T.td}>
                             <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
